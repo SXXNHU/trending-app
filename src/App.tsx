@@ -211,11 +211,13 @@ function App() {
     keyLight.position.set(0, 0, 0)
     const rimLight = new THREE.PointLight('#d8dce6', 16, 90, 2)
     rimLight.position.set(-18, 10, 16)
-    scene.add(ambientLight, keyLight, rimLight)
+    const warmLight = new THREE.PointLight('#ffb36b', 9, 80, 2)
+    warmLight.position.set(8, -4, 10)
+    scene.add(ambientLight, keyLight, rimLight, warmLight)
 
     const starGeometry = new THREE.BufferGeometry()
-    const starPositions = new Float32Array(1200 * 3)
-    for (let index = 0; index < 1200; index += 1) {
+    const starPositions = new Float32Array(1800 * 3)
+    for (let index = 0; index < 1800; index += 1) {
       starPositions[index * 3] = (Math.random() - 0.5) * 180
       starPositions[index * 3 + 1] = (Math.random() - 0.5) * 120
       starPositions[index * 3 + 2] = (Math.random() - 0.5) * 180
@@ -232,6 +234,57 @@ function App() {
       }),
     )
     scene.add(starField)
+
+    const galaxyGeometry = new THREE.BufferGeometry()
+    const galaxyPositions = new Float32Array(2400 * 3)
+    const galaxyColors = new Float32Array(2400 * 3)
+
+    for (let index = 0; index < 2400; index += 1) {
+      const armAngle = Math.random() * Math.PI * 2
+      const radius = Math.pow(Math.random(), 0.72) * 34
+      const spiral = armAngle + radius * 0.22
+      const spread = (Math.random() - 0.5) * 1.8
+
+      galaxyPositions[index * 3] = Math.cos(spiral) * radius + spread
+      galaxyPositions[index * 3 + 1] = (Math.random() - 0.5) * 2.2
+      galaxyPositions[index * 3 + 2] = Math.sin(spiral) * radius * 0.28 + spread * 0.6
+
+      const warmMix = Math.random()
+      const color = new THREE.Color(
+        warmMix > 0.88 ? '#ffb067' : warmMix > 0.56 ? '#d7ddff' : '#f4f6ff',
+      )
+      galaxyColors[index * 3] = color.r
+      galaxyColors[index * 3 + 1] = color.g
+      galaxyColors[index * 3 + 2] = color.b
+    }
+
+    galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions, 3))
+    galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors, 3))
+
+    const galaxyDust = new THREE.Points(
+      galaxyGeometry,
+      new THREE.PointsMaterial({
+        size: 0.18,
+        transparent: true,
+        opacity: 0.5,
+        vertexColors: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    galaxyDust.rotation.x = -0.16
+    scene.add(galaxyDust)
+
+    const coreGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(2.4, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color: '#fff3da',
+        transparent: true,
+        opacity: 0.1,
+        depthWrite: false,
+      }),
+    )
+    scene.add(coreGlow)
 
     const nodes = buildTopicNodes(topics)
     const childNodes = buildChildNodes(nodes)
@@ -457,6 +510,9 @@ function App() {
 
       starField.rotation.y += 0.00012
       starField.rotation.x = Math.sin(elapsed * 0.05) * 0.045
+      galaxyDust.rotation.y += 0.00032
+      galaxyDust.rotation.z = Math.sin(elapsed * 0.06) * 0.045
+      coreGlow.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.03)
 
       camera.position.lerp(cameraTarget, 0.045)
       currentLookAt.lerp(lookTarget, 0.05)
@@ -479,6 +535,7 @@ function App() {
       window.removeEventListener('resize', handleResize)
       renderer.dispose()
       starGeometry.dispose()
+      galaxyGeometry.dispose()
       cameraTargetRef.current = null
       lookTargetRef.current = null
       mount.innerHTML = ''
