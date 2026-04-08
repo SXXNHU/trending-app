@@ -19,6 +19,7 @@ type ChildNode = {
 type ClickableNode = {
   mesh: THREE.Mesh
   topic: TrendTopic
+  focusPoint: THREE.Vector3
 }
 
 const orbitRadii = [11, 16, 22]
@@ -120,6 +121,9 @@ function App() {
   const [modalTopicId, setModalTopicId] = useState<string | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   const focusTimeoutRef = useRef<number | null>(null)
+  const cameraTargetRef = useRef<THREE.Vector3 | null>(null)
+  const lookTargetRef = useRef<THREE.Vector3 | null>(null)
+  const centeredLookAtRef = useRef(new THREE.Vector3(0, 0, 0))
 
   useEffect(() => {
     let ignore = false
@@ -160,6 +164,20 @@ function App() {
   }, [])
 
   const topicMap = useMemo(() => new Map(topics.map((topic) => [topic.id, topic])), [topics])
+
+  function closeModalKeepOrbitView() {
+    selectedIdRef.current = null
+    setModalTopicId(null)
+
+    if (focusTimeoutRef.current !== null) {
+      window.clearTimeout(focusTimeoutRef.current)
+      focusTimeoutRef.current = null
+    }
+
+    if (lookTargetRef.current) {
+      lookTargetRef.current.copy(centeredLookAtRef.current)
+    }
+  }
 
   useEffect(() => {
     const mount = mountRef.current
@@ -237,7 +255,7 @@ function App() {
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.copy(node.position)
       sceneRoot.add(mesh)
-      clickables.push({ mesh, topic: node })
+      clickables.push({ mesh, topic: node, focusPoint: node.position.clone() })
 
       const glow = new THREE.Mesh(
         new THREE.SphereGeometry(node.radius * 1.18, 32, 32),
@@ -273,6 +291,15 @@ function App() {
       )
       mesh.position.copy(child.position)
       sceneRoot.add(mesh)
+
+      const parentTopic = nodeMap.get(child.parentId)
+      if (parentTopic) {
+        clickables.push({
+          mesh,
+          topic: parentTopic,
+          focusPoint: child.position.clone(),
+        })
+      }
 
       const label = makeLabelSprite(child.label, 18)
       label.position.copy(child.position.clone().add(new THREE.Vector3(0, child.radius + 0.42, 0)))
@@ -333,6 +360,8 @@ function App() {
     const cameraTarget = defaultCameraPosition.clone()
     const lookTarget = defaultLookAt.clone()
     const currentLookAt = defaultLookAt.clone()
+    cameraTargetRef.current = cameraTarget
+    lookTargetRef.current = lookTarget
     let pointerDown = { x: 0, y: 0, moved: false }
     let isDragging = false
     let isDisposed = false
@@ -379,9 +408,9 @@ function App() {
           const hit = clickables.find((entry) => entry.mesh === intersects[0].object)
           if (hit) {
             selectedIdRef.current = hit.topic.id
-            const focusDirection = hit.mesh.position.clone().normalize().multiplyScalar(6.6)
-            cameraTarget.copy(hit.mesh.position.clone().add(focusDirection))
-            lookTarget.copy(hit.mesh.position)
+            const focusDirection = hit.focusPoint.clone().normalize().multiplyScalar(6.6)
+            cameraTarget.copy(hit.focusPoint.clone().add(focusDirection))
+            lookTarget.copy(hit.focusPoint)
             setModalTopicId(null)
             if (focusTimeoutRef.current !== null) {
               window.clearTimeout(focusTimeoutRef.current)
@@ -450,6 +479,8 @@ function App() {
       window.removeEventListener('resize', handleResize)
       renderer.dispose()
       starGeometry.dispose()
+      cameraTargetRef.current = null
+      lookTargetRef.current = null
       mount.innerHTML = ''
     }
   }, [topics])
@@ -474,10 +505,7 @@ function App() {
 
       <div
         className={`modal-backdrop ${modalTopic ? '' : 'hidden'}`}
-        onClick={() => {
-          selectedIdRef.current = null
-          setModalTopicId(null)
-        }}
+        onClick={closeModalKeepOrbitView}
       />
       <section className={`topic-modal ${modalTopic ? '' : 'hidden'}`} aria-hidden={!modalTopic}>
         {modalTopic ? (
@@ -485,10 +513,7 @@ function App() {
             <button
               className="modal-close"
               type="button"
-              onClick={() => {
-                selectedIdRef.current = null
-                setModalTopicId(null)
-              }}
+              onClick={closeModalKeepOrbitView}
             >
               Close
             </button>
