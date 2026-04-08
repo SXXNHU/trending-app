@@ -218,63 +218,76 @@ function App() {
     warmLight.position.set(8, -4, 10)
     scene.add(ambientLight, keyLight, rimLight, warmLight)
 
-    const starGeometry = new THREE.BufferGeometry()
-    const starPositions = new Float32Array(1800 * 3)
-    for (let index = 0; index < 1800; index += 1) {
-      starPositions[index * 3] = (Math.random() - 0.5) * 180
-      starPositions[index * 3 + 1] = (Math.random() - 0.5) * 120
-      starPositions[index * 3 + 2] = (Math.random() - 0.5) * 180
+    const instanceHelper = new THREE.Object3D()
+
+    const starCount = 320
+    const starGeometry = new THREE.SphereGeometry(0.12, 12, 12)
+    const starMaterial = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      vertexColors: true,
+    })
+    const starField = new THREE.InstancedMesh(starGeometry, starMaterial, starCount)
+    for (let index = 0; index < starCount; index += 1) {
+      instanceHelper.position.set(
+        (Math.random() - 0.5) * 240,
+        (Math.random() - 0.5) * 150,
+        (Math.random() - 0.5) * 240,
+      )
+      const scale = 0.32 + Math.random() * 1.3
+      instanceHelper.scale.setScalar(scale)
+      instanceHelper.updateMatrix()
+      starField.setMatrixAt(index, instanceHelper.matrix)
+      const starTint = new THREE.Color(
+        Math.random() > 0.92 ? '#ffc27a' : Math.random() > 0.55 ? '#dbe2ff' : '#f7f9ff',
+      )
+      starField.setColorAt(index, starTint)
     }
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
-    const starField = new THREE.Points(
-      starGeometry,
-      new THREE.PointsMaterial({
-        color: '#eef2f7',
-        size: 0.1,
-        transparent: true,
-        opacity: 0.8,
-        depthWrite: false,
-      }),
-    )
+    starField.instanceMatrix.needsUpdate = true
+    if (starField.instanceColor) {
+      starField.instanceColor.needsUpdate = true
+    }
     scene.add(starField)
 
-    const galaxyGeometry = new THREE.BufferGeometry()
-    const galaxyPositions = new Float32Array(2400 * 3)
-    const galaxyColors = new Float32Array(2400 * 3)
+    const galaxyParticleCount = 640
+    const galaxyGeometry = new THREE.SphereGeometry(0.16, 12, 12)
+    const galaxyMaterial = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.38,
+      depthWrite: false,
+      vertexColors: true,
+    })
+    const galaxyDust = new THREE.InstancedMesh(galaxyGeometry, galaxyMaterial, galaxyParticleCount)
 
-    for (let index = 0; index < 2400; index += 1) {
+    for (let index = 0; index < galaxyParticleCount; index += 1) {
       const armAngle = Math.random() * Math.PI * 2
-      const radius = Math.pow(Math.random(), 0.72) * 34
-      const spiral = armAngle + radius * 0.22
-      const spread = (Math.random() - 0.5) * 1.8
+      const radius = Math.pow(Math.random(), 0.8) * 46
+      const spiral = armAngle + radius * 0.18
+      const spread = (Math.random() - 0.5) * 2.8
 
-      galaxyPositions[index * 3] = Math.cos(spiral) * radius + spread
-      galaxyPositions[index * 3 + 1] = (Math.random() - 0.5) * 2.2
-      galaxyPositions[index * 3 + 2] = Math.sin(spiral) * radius * 0.28 + spread * 0.6
+      instanceHelper.position.set(
+        Math.cos(spiral) * radius + spread,
+        (Math.random() - 0.5) * 1.4,
+        Math.sin(spiral) * radius * 0.22 + spread * 0.72,
+      )
+      const scale = 0.5 + Math.random() * 1.6
+      instanceHelper.scale.setScalar(scale)
+      instanceHelper.updateMatrix()
+      galaxyDust.setMatrixAt(index, instanceHelper.matrix)
 
       const warmMix = Math.random()
       const color = new THREE.Color(
         warmMix > 0.88 ? '#ffb067' : warmMix > 0.56 ? '#d7ddff' : '#f4f6ff',
       )
-      galaxyColors[index * 3] = color.r
-      galaxyColors[index * 3 + 1] = color.g
-      galaxyColors[index * 3 + 2] = color.b
+      galaxyDust.setColorAt(index, color)
     }
-
-    galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions, 3))
-    galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors, 3))
-
-    const galaxyDust = new THREE.Points(
-      galaxyGeometry,
-      new THREE.PointsMaterial({
-        size: 0.18,
-        transparent: true,
-        opacity: 0.5,
-        vertexColors: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
+    galaxyDust.instanceMatrix.needsUpdate = true
+    if (galaxyDust.instanceColor) {
+      galaxyDust.instanceColor.needsUpdate = true
+    }
     galaxyGroup.add(galaxyDust)
 
     const coreGlow = new THREE.Mesh(
