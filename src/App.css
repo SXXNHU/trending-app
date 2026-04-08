@@ -13,6 +13,9 @@ body {
   margin: 0;
   overflow: hidden;
   background:
+    radial-gradient(ellipse at 50% 55%, rgba(206, 216, 232, 0.055) 0%, rgba(120, 132, 156, 0.022) 18%, transparent 42%),
+    radial-gradient(ellipse at 28% 62%, rgba(208, 218, 235, 0.03) 0%, transparent 34%),
+    radial-gradient(ellipse at 74% 38%, rgba(198, 209, 228, 0.026) 0%, transparent 30%),
     radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03), transparent 18%),
     radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.05), transparent 12%),
     radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.04), transparent 14%),
@@ -28,12 +31,14 @@ button { font: inherit; }
   position: absolute;
   inset: 0;
   background-image:
+    radial-gradient(ellipse at 50% 54%, rgba(255, 255, 255, 0.08) 0 12%, rgba(255, 255, 255, 0.02) 16%, transparent 34%),
     radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.5px),
     radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px),
     radial-gradient(circle at 22% 76%, rgba(255, 255, 255, 0.5) 0 1px, transparent 1.5px),
     radial-gradient(circle at 68% 72%, rgba(255, 255, 255, 0.38) 0 1px, transparent 1.5px),
     radial-gradient(circle at 56% 42%, rgba(255, 255, 255, 0.3) 0 1px, transparent 1.5px);
-  opacity: 0.48;
+  opacity: 0.32;
+  filter: blur(0.3px);
   pointer-events: none;
 }
 
@@ -86,6 +91,16 @@ button { font: inherit; }
   width: 980px;
   height: 980px;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.025) 0%, transparent 66%);
+}
+
+.space-glow::after {
+  content: '';
+  position: absolute;
+  inset: 12% 10%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center, rgba(220, 228, 240, 0.065) 0%, rgba(190, 201, 219, 0.03) 22%, transparent 58%);
+  filter: blur(26px);
 }
 
 .scene-mount {

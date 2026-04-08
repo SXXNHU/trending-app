@@ -423,11 +423,11 @@ function App() {
     function animate() {
       const elapsed = clock.getElapsedTime()
       if (!isDragging && !selectedIdRef.current) {
-        sceneRoot.rotation.y += 0.0015
+        sceneRoot.rotation.y += 0.00055
       }
 
-      starField.rotation.y += 0.00035
-      starField.rotation.x = Math.sin(elapsed * 0.08) * 0.06
+      starField.rotation.y += 0.00012
+      starField.rotation.x = Math.sin(elapsed * 0.05) * 0.045
 
       camera.position.lerp(cameraTarget, 0.045)
       currentLookAt.lerp(lookTarget, 0.05)
