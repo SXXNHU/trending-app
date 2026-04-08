@@ -114,6 +114,42 @@ function buildChildNodes(nodes: TopicNode[]) {
   return children
 }
 
+function createInstancedSphereLayers(
+  counts: number[],
+  baseRadius: number,
+  createTransform: (helper: THREE.Object3D, index: number, count: number) => void,
+  createColor: () => THREE.Color,
+  opacities: number[],
+) {
+  const helper = new THREE.Object3D()
+
+  return counts.map((count, layerIndex) => {
+    const geometry = new THREE.SphereGeometry(baseRadius, 12, 12)
+    const material = new THREE.MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: opacities[layerIndex],
+      depthWrite: false,
+      vertexColors: true,
+    })
+    const mesh = new THREE.InstancedMesh(geometry, material, count)
+
+    for (let index = 0; index < count; index += 1) {
+      createTransform(helper, index, count)
+      helper.updateMatrix()
+      mesh.setMatrixAt(index, helper.matrix)
+      mesh.setColorAt(index, createColor())
+    }
+
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) {
+      mesh.instanceColor.needsUpdate = true
+    }
+
+    return { mesh, geometry, material }
+  })
+}
+
 function App() {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const [topics, setTopics] = useState<TrendTopic[]>(() => buildFallbackTrends())
@@ -218,77 +254,50 @@ function App() {
     warmLight.position.set(8, -4, 10)
     scene.add(ambientLight, keyLight, rimLight, warmLight)
 
-    const instanceHelper = new THREE.Object3D()
+    const starLayers = createInstancedSphereLayers(
+      [90, 120, 80],
+      0.12,
+      (helper) => {
+        helper.position.set(
+          (Math.random() - 0.5) * 340,
+          (Math.random() - 0.5) * 210,
+          (Math.random() - 0.5) * 340,
+        )
+        const scale = 0.28 + Math.random() * 1.6
+        helper.scale.setScalar(scale)
+      },
+      () =>
+        new THREE.Color(
+          Math.random() > 0.9 ? '#ffb86f' : Math.random() > 0.5 ? '#dbe3ff' : '#f7f9ff',
+        ),
+      [0.24, 0.5, 0.82],
+    )
+    starLayers.forEach((layer) => scene.add(layer.mesh))
 
-    const starCount = 320
-    const starGeometry = new THREE.SphereGeometry(0.12, 12, 12)
-    const starMaterial = new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      transparent: true,
-      opacity: 0.78,
-      depthWrite: false,
-      vertexColors: true,
-    })
-    const starField = new THREE.InstancedMesh(starGeometry, starMaterial, starCount)
-    for (let index = 0; index < starCount; index += 1) {
-      instanceHelper.position.set(
-        (Math.random() - 0.5) * 240,
-        (Math.random() - 0.5) * 150,
-        (Math.random() - 0.5) * 240,
-      )
-      const scale = 0.32 + Math.random() * 1.3
-      instanceHelper.scale.setScalar(scale)
-      instanceHelper.updateMatrix()
-      starField.setMatrixAt(index, instanceHelper.matrix)
-      const starTint = new THREE.Color(
-        Math.random() > 0.92 ? '#ffc27a' : Math.random() > 0.55 ? '#dbe2ff' : '#f7f9ff',
-      )
-      starField.setColorAt(index, starTint)
-    }
-    starField.instanceMatrix.needsUpdate = true
-    if (starField.instanceColor) {
-      starField.instanceColor.needsUpdate = true
-    }
-    scene.add(starField)
+    const galaxyLayers = createInstancedSphereLayers(
+      [180, 220, 140],
+      0.16,
+      (helper) => {
+        const armAngle = Math.random() * Math.PI * 2
+        const radius = Math.pow(Math.random(), 0.84) * 64
+        const spiral = armAngle + radius * 0.14
+        const spread = (Math.random() - 0.5) * 4.2
 
-    const galaxyParticleCount = 640
-    const galaxyGeometry = new THREE.SphereGeometry(0.16, 12, 12)
-    const galaxyMaterial = new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      transparent: true,
-      opacity: 0.38,
-      depthWrite: false,
-      vertexColors: true,
-    })
-    const galaxyDust = new THREE.InstancedMesh(galaxyGeometry, galaxyMaterial, galaxyParticleCount)
-
-    for (let index = 0; index < galaxyParticleCount; index += 1) {
-      const armAngle = Math.random() * Math.PI * 2
-      const radius = Math.pow(Math.random(), 0.8) * 46
-      const spiral = armAngle + radius * 0.18
-      const spread = (Math.random() - 0.5) * 2.8
-
-      instanceHelper.position.set(
-        Math.cos(spiral) * radius + spread,
-        (Math.random() - 0.5) * 1.4,
-        Math.sin(spiral) * radius * 0.22 + spread * 0.72,
-      )
-      const scale = 0.5 + Math.random() * 1.6
-      instanceHelper.scale.setScalar(scale)
-      instanceHelper.updateMatrix()
-      galaxyDust.setMatrixAt(index, instanceHelper.matrix)
-
-      const warmMix = Math.random()
-      const color = new THREE.Color(
-        warmMix > 0.88 ? '#ffb067' : warmMix > 0.56 ? '#d7ddff' : '#f4f6ff',
-      )
-      galaxyDust.setColorAt(index, color)
-    }
-    galaxyDust.instanceMatrix.needsUpdate = true
-    if (galaxyDust.instanceColor) {
-      galaxyDust.instanceColor.needsUpdate = true
-    }
-    galaxyGroup.add(galaxyDust)
+        helper.position.set(
+          Math.cos(spiral) * radius + spread,
+          (Math.random() - 0.5) * 1.6,
+          Math.sin(spiral) * radius * 0.18 + spread * 0.78,
+        )
+        const scale = 0.42 + Math.random() * 1.8
+        helper.scale.setScalar(scale)
+      },
+      () =>
+        new THREE.Color(
+          Math.random() > 0.84 ? '#ffad63' : Math.random() > 0.45 ? '#d7ddff' : '#f5f7ff',
+        ),
+      [0.12, 0.24, 0.42],
+    )
+    galaxyLayers.forEach((layer) => galaxyGroup.add(layer.mesh))
 
     const coreGlow = new THREE.Mesh(
       new THREE.SphereGeometry(2.4, 32, 32),
@@ -523,10 +532,14 @@ function App() {
         sceneRoot.rotation.y += 0.00055
       }
 
-      starField.rotation.y += 0.00012
-      starField.rotation.x = Math.sin(elapsed * 0.05) * 0.045
-      galaxyDust.rotation.y += 0.00032
-      galaxyDust.rotation.x = Math.sin(elapsed * 0.06) * 0.012
+      starLayers.forEach((layer, index) => {
+        layer.mesh.rotation.y += 0.00005 + index * 0.000015
+        layer.mesh.rotation.x = Math.sin(elapsed * (0.035 + index * 0.01)) * 0.03
+      })
+      galaxyLayers.forEach((layer, index) => {
+        layer.mesh.rotation.y += 0.00018 + index * 0.00004
+        layer.mesh.rotation.x = Math.sin(elapsed * (0.045 + index * 0.014)) * 0.01
+      })
       coreGlow.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.03)
 
       camera.position.lerp(cameraTarget, 0.045)
@@ -549,8 +562,14 @@ function App() {
       window.removeEventListener('pointerup', handlePointerUp)
       window.removeEventListener('resize', handleResize)
       renderer.dispose()
-      starGeometry.dispose()
-      galaxyGeometry.dispose()
+      starLayers.forEach((layer) => {
+        layer.geometry.dispose()
+        layer.material.dispose()
+      })
+      galaxyLayers.forEach((layer) => {
+        layer.geometry.dispose()
+        layer.material.dispose()
+      })
       cameraTargetRef.current = null
       lookTargetRef.current = null
       mount.innerHTML = ''

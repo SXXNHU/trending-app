@@ -1,4 +1,6 @@
-﻿:root {
+@import url('https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/variable/woff2/SUIT-Variable.css');
+
+:root {
   color-scheme: dark;
   --line: rgba(232, 238, 247, 0.1);
   --line-soft: rgba(240, 244, 250, 0.08);
@@ -12,6 +14,15 @@
 body {
   margin: 0;
   overflow: hidden;
+  font-family:
+    'HSJiphyeongseon',
+    'HS 지평선',
+    'HS지평선체',
+    'SUIT Variable',
+    'Pretendard Variable',
+    'Apple SD Gothic Neo',
+    'Noto Sans KR',
+    sans-serif;
   background:
     radial-gradient(circle at 18% 18%, rgba(96, 112, 154, 0.11), transparent 24%),
     radial-gradient(circle at 84% 24%, rgba(255, 176, 106, 0.08), transparent 18%),
@@ -62,6 +73,7 @@ button { font: inherit; }
   text-transform: uppercase;
   backdrop-filter: blur(12px);
 }
+
 .source-pill.ghost { color: var(--muted); }
 .source-pill.is-live { color: #f4f7fb; }
 .source-pill.is-loading { color: #d3dae4; }
@@ -91,6 +103,7 @@ button { font: inherit; }
   background: rgba(0, 0, 0, 0.62);
   backdrop-filter: blur(12px);
 }
+
 .topic-modal {
   position: fixed;
   inset: auto 14px 16px;
@@ -102,6 +115,7 @@ button { font: inherit; }
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
 }
+
 .modal-close {
   display: inline-flex;
   margin-left: auto;
@@ -109,18 +123,25 @@ button { font: inherit; }
   border-radius: 999px;
   padding: 10px 12px;
   color: var(--text);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255, 255, 255, 0.04);
 }
-.modal-kicker, .modal-summary, .modal-reasons p, .modal-meta {
+
+.modal-kicker,
+.modal-summary,
+.modal-reasons p,
+.modal-meta {
   margin: 0;
   color: var(--muted);
 }
+
 .topic-modal h2 {
   margin: 12px 0 0;
   font-size: clamp(1.6rem, 7vw, 2.35rem);
   letter-spacing: -0.05em;
 }
+
 .modal-summary { margin-top: 12px; line-height: 1.7; }
+
 .modal-meta {
   display: flex;
   flex-wrap: wrap;
@@ -128,25 +149,29 @@ button { font: inherit; }
   margin-top: 14px;
   font-size: 0.88rem;
 }
+
 .keyword-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
 }
+
 .keyword-row span {
   padding: 8px 10px;
   border: 1px solid var(--line-soft);
   border-radius: 999px;
   color: var(--text);
   font-size: 0.8rem;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
+
 .modal-reasons { display: grid; gap: 10px; margin-top: 16px; }
 .hidden { display: none; }
 
 @media (min-width: 860px) {
   .space-hud { inset-inline: 28px; }
+
   .topic-modal {
     inset: 50% auto auto 50%;
     width: min(620px, calc(100vw - 40px));
