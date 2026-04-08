@@ -152,18 +152,18 @@ function createInstancedSphereLayers(
 }
 
 function createAccentOrb() {
-  const isWarm = Math.random() > 0.5
+  const isWarm = Math.random() > 0.35
   const hue = isWarm ? 28 + Math.random() * 14 : 210 + Math.random() * 18
-  const saturation = isWarm ? 0.28 + Math.random() * 0.36 : 0.04 + Math.random() * 0.14
-  const lightness = isWarm ? 0.68 + Math.random() * 0.16 : 0.84 + Math.random() * 0.12
+  const saturation = isWarm ? 0.48 + Math.random() * 0.34 : 0.04 + Math.random() * 0.14
+  const lightness = isWarm ? 0.72 + Math.random() * 0.18 : 0.84 + Math.random() * 0.12
   const color = new THREE.Color().setHSL(hue / 360, saturation, Math.min(lightness, 0.97))
 
-  const radius = 0.24 + Math.random() * 1.22
+  const radius = isWarm ? 0.42 + Math.random() * 1.36 : 0.24 + Math.random() * 1.02
   const geometry = new THREE.SphereGeometry(radius, 18, 18)
   const material = new THREE.MeshPhysicalMaterial({
     color,
     transparent: true,
-    opacity: 0.12 + Math.random() * 0.5,
+    opacity: isWarm ? 0.34 + Math.random() * 0.4 : 0.12 + Math.random() * 0.36,
     transmission: 0.85 + Math.random() * 0.12,
     roughness: 0.06 + Math.random() * 0.18,
     thickness: 0.4 + Math.random() * 1.6,
@@ -308,7 +308,7 @@ function App() {
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.72 ? '#ffb56b' : Math.random() > 0.36 ? '#dbe3ff' : '#ffffff',
+          Math.random() > 0.58 ? '#ffab57' : Math.random() > 0.28 ? '#dbe3ff' : '#ffffff',
         ),
       [0.12, 0.38, 0.88],
     )
@@ -333,7 +333,7 @@ function App() {
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.7 ? '#ffaf62' : Math.random() > 0.34 ? '#d7ddff' : '#ffffff',
+          Math.random() > 0.52 ? '#ffa24c' : Math.random() > 0.24 ? '#d7ddff' : '#ffffff',
         ),
       [0.08, 0.22, 0.5],
     )
