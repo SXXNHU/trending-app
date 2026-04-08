@@ -17,6 +17,13 @@ export type TrendTopic = TrendTopicSeed & {
   buzz: number
   sourceLabel: string
   collectedAt: string
+  evidence?: {
+    source: 'NEWS' | 'BLOG' | 'CAFE'
+    title: string
+    snippet: string
+    link: string
+    publishedAt?: string
+  }[]
 }
 
 export const trendTopicSeeds: TrendTopicSeed[] = [

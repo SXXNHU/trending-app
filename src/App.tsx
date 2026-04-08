@@ -53,6 +53,12 @@ function formatClock(isoString: string) {
   })
 }
 
+function formatEvidenceSource(source: 'NEWS' | 'BLOG' | 'CAFE') {
+  if (source === 'NEWS') return 'NEWS'
+  if (source === 'BLOG') return 'BLOG'
+  return 'CAFE'
+}
+
 function makeLabelSprite(text: string, fontSize: number) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
@@ -701,6 +707,23 @@ function App() {
                 <p key={reason}>{reason}</p>
               ))}
             </div>
+            {modalTopic.evidence?.length ? (
+              <div className="evidence-list">
+                {modalTopic.evidence.map((item) => (
+                  <a
+                    key={`${item.source}-${item.link}-${item.title}`}
+                    className="evidence-card"
+                    href={item.link}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span className="evidence-source">{formatEvidenceSource(item.source)}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.snippet}</p>
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </>
         ) : null}
       </section>
