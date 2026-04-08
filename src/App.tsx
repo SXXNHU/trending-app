@@ -40,19 +40,20 @@ function formatClock(isoString: string) {
 function makeLabelSprite(text: string, fontSize: number) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
+  const fontFamily = '"HSJiphyeongseon", "HS 지평선", "HS지평선체", "SUIT Variable", "Pretendard Variable", sans-serif'
 
   if (!context) {
     return new THREE.Sprite()
   }
 
-  context.font = `${fontSize}px Arial`
+  context.font = `${fontSize}px ${fontFamily}`
   const width = Math.ceil(context.measureText(text).width + 28)
   const height = Math.ceil(fontSize + 22)
   canvas.width = width
   canvas.height = height
 
   context.clearRect(0, 0, width, height)
-  context.font = `${fontSize}px Arial`
+  context.font = `${fontSize}px ${fontFamily}`
   context.fillStyle = 'rgba(240,244,250,0.9)'
   context.textAlign = 'center'
   context.textBaseline = 'middle'
@@ -255,47 +256,47 @@ function App() {
     scene.add(ambientLight, keyLight, rimLight, warmLight)
 
     const starLayers = createInstancedSphereLayers(
-      [90, 120, 80],
-      0.12,
+      [26, 44, 20],
+      0.14,
       (helper) => {
         helper.position.set(
-          (Math.random() - 0.5) * 340,
-          (Math.random() - 0.5) * 210,
-          (Math.random() - 0.5) * 340,
+          (Math.random() - 0.5) * 460,
+          (Math.random() - 0.5) * 280,
+          (Math.random() - 0.5) * 460,
         )
-        const scale = 0.28 + Math.random() * 1.6
+        const scale = 0.45 + Math.random() * 2.6
         helper.scale.setScalar(scale)
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.9 ? '#ffb86f' : Math.random() > 0.5 ? '#dbe3ff' : '#f7f9ff',
+          Math.random() > 0.72 ? '#ffb56b' : Math.random() > 0.36 ? '#dbe3ff' : '#ffffff',
         ),
-      [0.24, 0.5, 0.82],
+      [0.12, 0.38, 0.88],
     )
-    starLayers.forEach((layer) => scene.add(layer.mesh))
+    starLayers.forEach((layer) => sceneRoot.add(layer.mesh))
 
     const galaxyLayers = createInstancedSphereLayers(
-      [180, 220, 140],
-      0.16,
+      [70, 110, 56],
+      0.18,
       (helper) => {
         const armAngle = Math.random() * Math.PI * 2
-        const radius = Math.pow(Math.random(), 0.84) * 64
-        const spiral = armAngle + radius * 0.14
-        const spread = (Math.random() - 0.5) * 4.2
+        const radius = Math.pow(Math.random(), 0.86) * 108
+        const spiral = armAngle + radius * 0.1
+        const spread = (Math.random() - 0.5) * 8.4
 
         helper.position.set(
           Math.cos(spiral) * radius + spread,
-          (Math.random() - 0.5) * 1.6,
-          Math.sin(spiral) * radius * 0.18 + spread * 0.78,
+          (Math.random() - 0.5) * 1.8,
+          Math.sin(spiral) * radius * 0.14 + spread * 0.92,
         )
-        const scale = 0.42 + Math.random() * 1.8
+        const scale = 0.6 + Math.random() * 2.8
         helper.scale.setScalar(scale)
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.84 ? '#ffad63' : Math.random() > 0.45 ? '#d7ddff' : '#f5f7ff',
+          Math.random() > 0.7 ? '#ffaf62' : Math.random() > 0.34 ? '#d7ddff' : '#ffffff',
         ),
-      [0.12, 0.24, 0.42],
+      [0.08, 0.22, 0.5],
     )
     galaxyLayers.forEach((layer) => galaxyGroup.add(layer.mesh))
 
