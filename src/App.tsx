@@ -151,6 +151,45 @@ function createInstancedSphereLayers(
   })
 }
 
+function createAccentOrb() {
+  const isWarm = Math.random() > 0.5
+  const hue = isWarm ? 28 + Math.random() * 14 : 210 + Math.random() * 18
+  const saturation = isWarm ? 0.28 + Math.random() * 0.36 : 0.04 + Math.random() * 0.14
+  const lightness = isWarm ? 0.68 + Math.random() * 0.16 : 0.84 + Math.random() * 0.12
+  const color = new THREE.Color().setHSL(hue / 360, saturation, Math.min(lightness, 0.97))
+
+  const radius = 0.24 + Math.random() * 1.22
+  const geometry = new THREE.SphereGeometry(radius, 18, 18)
+  const material = new THREE.MeshPhysicalMaterial({
+    color,
+    transparent: true,
+    opacity: 0.12 + Math.random() * 0.5,
+    transmission: 0.85 + Math.random() * 0.12,
+    roughness: 0.06 + Math.random() * 0.18,
+    thickness: 0.4 + Math.random() * 1.6,
+    ior: 1.1 + Math.random() * 0.1,
+    metalness: 0,
+    clearcoat: 0.6 + Math.random() * 0.4,
+    clearcoatRoughness: 0.04 + Math.random() * 0.18,
+    depthWrite: false,
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const distance = 28 + Math.random() * 132
+  const angle = Math.random() * Math.PI * 2
+  const tilt = (Math.random() - 0.5) * 0.32
+  mesh.position.set(
+    Math.cos(angle) * distance,
+    (Math.random() - 0.5) * 42,
+    Math.sin(angle + tilt) * distance * (0.42 + Math.random() * 0.48),
+  )
+
+  const scale = 0.8 + Math.random() * 1.6
+  mesh.scale.setScalar(scale)
+
+  return { mesh, geometry, material }
+}
+
 function App() {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const [topics, setTopics] = useState<TrendTopic[]>(() => buildFallbackTrends())
@@ -299,6 +338,9 @@ function App() {
       [0.08, 0.22, 0.5],
     )
     galaxyLayers.forEach((layer) => galaxyGroup.add(layer.mesh))
+
+    const accentOrbs = Array.from({ length: 26 }, () => createAccentOrb())
+    accentOrbs.forEach((orb) => sceneRoot.add(orb.mesh))
 
     const coreGlow = new THREE.Mesh(
       new THREE.SphereGeometry(2.4, 32, 32),
@@ -541,6 +583,10 @@ function App() {
         layer.mesh.rotation.y += 0.00018 + index * 0.00004
         layer.mesh.rotation.x = Math.sin(elapsed * (0.045 + index * 0.014)) * 0.01
       })
+      accentOrbs.forEach((orb, index) => {
+        orb.mesh.rotation.y += 0.0003 + index * 0.000008
+        orb.mesh.position.y += Math.sin(elapsed * (0.22 + index * 0.013)) * 0.0025
+      })
       coreGlow.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.03)
 
       camera.position.lerp(cameraTarget, 0.045)
@@ -570,6 +616,10 @@ function App() {
       galaxyLayers.forEach((layer) => {
         layer.geometry.dispose()
         layer.material.dispose()
+      })
+      accentOrbs.forEach((orb) => {
+        orb.geometry.dispose()
+        orb.material.dispose()
       })
       cameraTargetRef.current = null
       lookTargetRef.current = null
