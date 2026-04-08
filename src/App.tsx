@@ -24,6 +24,22 @@ type ClickableNode = {
 
 const orbitRadii = [11, 16, 22]
 
+function getViewportPreset(width: number) {
+  const isCompact = width <= 640
+
+  return {
+    isCompact,
+    cameraDistance: isCompact ? 39 : 32,
+    cameraFov: isCompact ? 56 : 48,
+    sceneScale: isCompact ? 0.86 : 1,
+    dragX: isCompact ? 0.0016 : 0.0022,
+    dragY: isCompact ? 0.0012 : 0.0016,
+    mainLabelFont: isCompact ? 23 : 30,
+    childLabelFont: isCompact ? 15 : 18,
+    focusDistance: isCompact ? 7.8 : 6.6,
+  }
+}
+
 function formatBuzz(buzz: number) {
   return `${buzz.toLocaleString('en-US')} signals`
 }
@@ -263,14 +279,15 @@ function App() {
 
     const scene = new THREE.Scene()
     scene.fog = new THREE.FogExp2('#03060d', 0.028)
+    const viewportPreset = getViewportPreset(mount.clientWidth)
 
     const camera = new THREE.PerspectiveCamera(
-      48,
+      viewportPreset.cameraFov,
       mount.clientWidth / mount.clientHeight,
       0.1,
       200,
     )
-    camera.position.set(0, 0, 32)
+    camera.position.set(0, 0, viewportPreset.cameraDistance)
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -280,6 +297,7 @@ function App() {
     mount.appendChild(renderer.domElement)
 
     const sceneRoot = new THREE.Group()
+    sceneRoot.scale.setScalar(viewportPreset.sceneScale)
     scene.add(sceneRoot)
 
     const galaxyGroup = new THREE.Group()
@@ -389,7 +407,7 @@ function App() {
       glow.position.copy(node.position)
       sceneRoot.add(glow)
 
-      const label = makeLabelSprite(node.label, 30)
+      const label = makeLabelSprite(node.label, viewportPreset.mainLabelFont)
       label.position.copy(node.position.clone().add(new THREE.Vector3(0, node.radius + 1.15, 0)))
       sceneRoot.add(label)
     })
@@ -421,7 +439,7 @@ function App() {
         })
       }
 
-      const label = makeLabelSprite(child.label, 18)
+      const label = makeLabelSprite(child.label, viewportPreset.childLabelFont)
       label.position.copy(child.position.clone().add(new THREE.Vector3(0, child.radius + 0.42, 0)))
       sceneRoot.add(label)
 
@@ -475,7 +493,7 @@ function App() {
 
     const raycaster = new THREE.Raycaster()
     const pointer = new THREE.Vector2()
-    const defaultCameraPosition = new THREE.Vector3(0, 0, 32)
+    const defaultCameraPosition = new THREE.Vector3(0, 0, viewportPreset.cameraDistance)
     const defaultLookAt = new THREE.Vector3(0, 0, 0)
     const cameraTarget = defaultCameraPosition.clone()
     const lookTarget = defaultLookAt.clone()
@@ -508,8 +526,9 @@ function App() {
         pointerDown.moved = true
       }
 
-      sceneRoot.rotation.y += deltaX * 0.0022
-      sceneRoot.rotation.x += deltaY * 0.0016
+      const activePreset = getViewportPreset(mount?.clientWidth ?? window.innerWidth)
+      sceneRoot.rotation.y += deltaX * activePreset.dragX
+      sceneRoot.rotation.x += deltaY * activePreset.dragY
       sceneRoot.rotation.x = Math.max(-0.5, Math.min(0.5, sceneRoot.rotation.x))
       pointerDown.x = event.clientX
       pointerDown.y = event.clientY
@@ -528,7 +547,8 @@ function App() {
           const hit = clickables.find((entry) => entry.mesh === intersects[0].object)
           if (hit) {
             selectedIdRef.current = hit.topic.id
-            const focusDirection = hit.focusPoint.clone().normalize().multiplyScalar(6.6)
+            const activePreset = getViewportPreset(mount?.clientWidth ?? window.innerWidth)
+            const focusDirection = hit.focusPoint.clone().normalize().multiplyScalar(activePreset.focusDistance)
             cameraTarget.copy(hit.focusPoint.clone().add(focusDirection))
             lookTarget.copy(hit.focusPoint)
             setModalTopicId(null)
@@ -560,9 +580,16 @@ function App() {
       if (!mount) {
         return
       }
+      const activePreset = getViewportPreset(mount.clientWidth)
       camera.aspect = mount.clientWidth / mount.clientHeight
+      camera.fov = activePreset.cameraFov
       camera.updateProjectionMatrix()
       renderer.setSize(mount.clientWidth, mount.clientHeight)
+      sceneRoot.scale.setScalar(activePreset.sceneScale)
+      defaultCameraPosition.set(0, 0, activePreset.cameraDistance)
+      if (!selectedIdRef.current) {
+        cameraTarget.copy(defaultCameraPosition)
+      }
     }
 
     window.addEventListener('resize', handleResize)

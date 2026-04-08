@@ -11,13 +11,18 @@
 
 * { box-sizing: border-box; }
 
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   overflow: hidden;
   font-family:
     'HSJiphyeongseon',
-    'HS 지평선',
-    'HS지평선체',
     'SUIT Variable',
     'Pretendard Variable',
     'Apple SD Gothic Neo',
@@ -34,7 +39,13 @@ body {
 body:has(.topic-modal:not(.hidden)) { overflow: hidden; }
 button { font: inherit; }
 
-.space-shell { position: relative; min-height: 100vh; isolation: isolate; }
+.space-shell {
+  position: relative;
+  min-height: 100dvh;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
 .space-noise {
   position: absolute;
   inset: 0;
@@ -56,6 +67,7 @@ button { font: inherit; }
   z-index: 4;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -81,6 +93,7 @@ button { font: inherit; }
 
 .scene-viewport {
   position: relative;
+  min-height: 100dvh;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -88,6 +101,7 @@ button { font: inherit; }
 .scene-mount {
   position: absolute;
   inset: 0;
+  touch-action: none;
 }
 
 .scene-mount canvas {
@@ -114,6 +128,9 @@ button { font: inherit; }
   background: rgba(8, 12, 20, 0.9);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
+  max-height: min(72vh, 620px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-close {
@@ -168,6 +185,46 @@ button { font: inherit; }
 
 .modal-reasons { display: grid; gap: 10px; margin-top: 16px; }
 .hidden { display: none; }
+
+@media (max-width: 640px) {
+  .space-hud {
+    inset: 14px 12px auto;
+    gap: 8px;
+  }
+
+  .source-pill {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+  }
+
+  .topic-modal {
+    inset: auto 10px 10px;
+    padding: 16px;
+    border-radius: 22px;
+    max-height: min(68vh, 560px);
+  }
+
+  .topic-modal h2 {
+    font-size: clamp(1.35rem, 7vw, 1.9rem);
+  }
+
+  .modal-summary,
+  .modal-reasons p {
+    font-size: 0.94rem;
+    line-height: 1.62;
+  }
+
+  .keyword-row {
+    gap: 6px;
+  }
+
+  .keyword-row span {
+    padding: 7px 9px;
+    font-size: 0.74rem;
+  }
+}
 
 @media (min-width: 860px) {
   .space-hud { inset-inline: 28px; }
