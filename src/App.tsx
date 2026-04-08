@@ -9,6 +9,16 @@ type PositionedTopic = TrendTopic & {
   size: number
 }
 
+type ChildOrb = {
+  id: string
+  label: string
+  parentId: string
+  x: number
+  y: number
+  z: number
+  size: number
+}
+
 type Edge = {
   id: string
   length: number
@@ -18,7 +28,7 @@ type Edge = {
   z: number
 }
 
-const orbitRadii = [112, 176, 248]
+const orbitRadii = [170, 270, 380]
 
 function formatBuzz(buzz: number) {
   return `${buzz.toLocaleString('en-US')} signals`
@@ -85,7 +95,7 @@ function App() {
 
         return {
           ...currentRotation,
-          y: currentRotation.y + 0.18,
+          y: currentRotation.y + 0.12,
         }
       })
     }, 40)
@@ -107,11 +117,11 @@ function App() {
   const positionedTopics = useMemo<PositionedTopic[]>(() => {
     return topics.map((topic, index) => {
       const radius = orbitRadii[topic.orbit]
-      const angle = topic.angle + index * 0.16
+      const angle = topic.angle + index * 0.12
       const x = Math.cos(angle) * radius
       const z = Math.sin(angle) * radius
-      const y = Math.sin(angle * 1.5) * 66 + (topic.orbit - 1) * 20
-      const size = Math.max(72, Math.min(146, 54 + topic.trafficScore * 0.72))
+      const y = Math.sin(angle * 1.5) * 84 + (topic.orbit - 1) * 26
+      const size = Math.max(84, Math.min(168, 60 + topic.trafficScore * 0.78))
 
       return {
         ...topic,
@@ -127,6 +137,29 @@ function App() {
     () => new Map(positionedTopics.map((topic) => [topic.id, topic])),
     [positionedTopics],
   )
+
+  const childOrbs = useMemo<ChildOrb[]>(() => {
+    const nextChildren: ChildOrb[] = []
+
+    positionedTopics.forEach((topic) => {
+      const children = topic.relatedTopics ?? []
+      children.forEach((childLabel, index) => {
+        const childAngle = (Math.PI * 2 * index) / Math.max(children.length, 1)
+        const childRadius = topic.size * 0.58 + 44
+        nextChildren.push({
+          id: `${topic.id}-${childLabel}`,
+          label: childLabel,
+          parentId: topic.id,
+          x: topic.x + Math.cos(childAngle) * childRadius,
+          y: topic.y + Math.sin(childAngle) * (childRadius * 0.62),
+          z: topic.z + Math.sin(childAngle * 1.35) * 22,
+          size: Math.max(24, Math.min(40, topic.size * 0.24)),
+        })
+      })
+    })
+
+    return nextChildren
+  }, [positionedTopics])
 
   const edges = useMemo<Edge[]>(() => {
     const nextEdges: Edge[] = []
@@ -164,10 +197,34 @@ function App() {
     return nextEdges
   }, [positionedTopics, topicMap])
 
+  const childEdges = useMemo<Edge[]>(() => {
+    return childOrbs
+      .map((child) => {
+        const parent = topicMap.get(child.parentId)
+        if (!parent) {
+          return null
+        }
+
+        const dx = child.x - parent.x
+        const dy = child.y - parent.y
+        const length = Math.hypot(dx, dy)
+
+        return {
+          id: `${child.id}:edge`,
+          length,
+          angle: Math.atan2(dy, dx),
+          midX: (child.x + parent.x) / 2,
+          midY: (child.y + parent.y) / 2,
+          z: (child.z + parent.z) / 2,
+        }
+      })
+      .filter((edge): edge is Edge => edge !== null)
+  }, [childOrbs, topicMap])
+
   const selectedTopic = positionedTopics.find((topic) => topic.id === selectedTopicId) ?? null
   const modalTopic = positionedTopics.find((topic) => topic.id === modalTopicId) ?? null
   const sceneTransform = selectedTopic
-    ? `translate3d(${-selectedTopic.x * 0.5}px, ${-selectedTopic.y * 0.52}px, 150px) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(1.34)`
+    ? `translate3d(${-selectedTopic.x * 0.54}px, ${-selectedTopic.y * 0.56}px, 180px) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(1.26)`
     : `translate3d(0, 0, 0) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(1)`
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -188,8 +245,8 @@ function App() {
     const deltaY = event.clientY - dragRef.current.startY
 
     setRotation({
-      x: Math.max(-52, Math.min(52, dragRef.current.baseX - deltaY * 0.1)),
-      y: dragRef.current.baseY + deltaX * 0.16,
+      x: Math.max(-52, Math.min(52, dragRef.current.baseX - deltaY * 0.08)),
+      y: dragRef.current.baseY + deltaX * 0.12,
     })
   }
 
@@ -234,12 +291,38 @@ function App() {
           {edges.map((edge) => (
             <span
               key={edge.id}
-              className="link-line"
+              className="link-line major"
               style={{
                 width: `${edge.length}px`,
                 transform: `translate3d(${edge.midX - edge.length / 2}px, ${edge.midY}px, ${edge.z}px) rotate(${edge.angle}rad)`,
               }}
             />
+          ))}
+
+          {childEdges.map((edge) => (
+            <span
+              key={edge.id}
+              className="link-line minor"
+              style={{
+                width: `${edge.length}px`,
+                transform: `translate3d(${edge.midX - edge.length / 2}px, ${edge.midY}px, ${edge.z}px) rotate(${edge.angle}rad)`,
+              }}
+            />
+          ))}
+
+          {childOrbs.map((child) => (
+            <span
+              key={child.id}
+              className="child-sphere"
+              style={{
+                '--child-size': `${child.size}px`,
+                '--child-x': `${child.x}px`,
+                '--child-y': `${child.y}px`,
+                '--child-z': `${child.z}px`,
+              } as React.CSSProperties}
+            >
+              <span>{child.label}</span>
+            </span>
           ))}
 
           {positionedTopics.map((topic) => (
@@ -258,6 +341,7 @@ function App() {
             >
               <span className="sphere-aura"></span>
               <span className="sphere-sheen"></span>
+              <span className="sphere-core"></span>
               <span className="sphere-label">
                 <strong>{topic.label}</strong>
               </span>
