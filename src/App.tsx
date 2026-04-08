@@ -206,6 +206,9 @@ function App() {
     const sceneRoot = new THREE.Group()
     scene.add(sceneRoot)
 
+    const galaxyGroup = new THREE.Group()
+    sceneRoot.add(galaxyGroup)
+
     const ambientLight = new THREE.AmbientLight('#f1f4ff', 1.7)
     const keyLight = new THREE.PointLight('#e8f1ff', 36, 140, 2)
     keyLight.position.set(0, 0, 0)
@@ -272,8 +275,7 @@ function App() {
         blending: THREE.AdditiveBlending,
       }),
     )
-    galaxyDust.rotation.x = -0.16
-    scene.add(galaxyDust)
+    galaxyGroup.add(galaxyDust)
 
     const coreGlow = new THREE.Mesh(
       new THREE.SphereGeometry(2.4, 32, 32),
@@ -284,7 +286,7 @@ function App() {
         depthWrite: false,
       }),
     )
-    scene.add(coreGlow)
+    galaxyGroup.add(coreGlow)
 
     const nodes = buildTopicNodes(topics)
     const childNodes = buildChildNodes(nodes)
@@ -511,7 +513,7 @@ function App() {
       starField.rotation.y += 0.00012
       starField.rotation.x = Math.sin(elapsed * 0.05) * 0.045
       galaxyDust.rotation.y += 0.00032
-      galaxyDust.rotation.z = Math.sin(elapsed * 0.06) * 0.045
+      galaxyDust.rotation.x = Math.sin(elapsed * 0.06) * 0.012
       coreGlow.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.03)
 
       camera.position.lerp(cameraTarget, 0.045)
