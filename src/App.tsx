@@ -1,34 +1,27 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import * as THREE from 'three'
 import './App.css'
 import { buildFallbackTrends, type TrendTopic } from './data/trendItems'
 
-type PositionedTopic = TrendTopic & {
-  x: number
-  y: number
-  z: number
-  size: number
+type TopicNode = TrendTopic & {
+  position: THREE.Vector3
+  radius: number
 }
 
-type ChildOrb = {
+type ChildNode = {
   id: string
   label: string
   parentId: string
-  x: number
-  y: number
-  z: number
-  size: number
+  position: THREE.Vector3
+  radius: number
 }
 
-type Edge = {
-  id: string
-  length: number
-  angle: number
-  midX: number
-  midY: number
-  z: number
+type ClickableNode = {
+  mesh: THREE.Mesh
+  topic: TrendTopic
 }
 
-const orbitRadii = [170, 270, 380]
+const orbitRadii = [11, 16, 22]
 
 function formatBuzz(buzz: number) {
   return `${buzz.toLocaleString('en-US')} signals`
@@ -43,18 +36,89 @@ function formatClock(isoString: string) {
   })
 }
 
+function makeLabelSprite(text: string, fontSize: number) {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    return new THREE.Sprite()
+  }
+
+  context.font = `${fontSize}px Arial`
+  const width = Math.ceil(context.measureText(text).width + 28)
+  const height = Math.ceil(fontSize + 22)
+  canvas.width = width
+  canvas.height = height
+
+  context.clearRect(0, 0, width, height)
+  context.font = `${fontSize}px Arial`
+  context.fillStyle = 'rgba(240,244,250,0.9)'
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.fillText(text, width / 2, height / 2)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.needsUpdate = true
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+  })
+  const sprite = new THREE.Sprite(material)
+  sprite.scale.set(width / 70, height / 70, 1)
+  return sprite
+}
+
+function buildTopicNodes(topics: TrendTopic[]) {
+  return topics.map((topic, index) => {
+    const radius = orbitRadii[topic.orbit]
+    const angle = topic.angle + index * 0.12
+    const x = Math.cos(angle) * radius
+    const z = Math.sin(angle) * radius
+    const y = Math.sin(angle * 1.4) * 5.6 + (topic.orbit - 1) * 2
+
+    return {
+      ...topic,
+      position: new THREE.Vector3(x, y, z),
+      radius: Math.max(1.15, Math.min(2.55, 0.95 + topic.trafficScore * 0.018)),
+    }
+  })
+}
+
+function buildChildNodes(nodes: TopicNode[]) {
+  const children: ChildNode[] = []
+
+  nodes.forEach((node) => {
+    const related = node.relatedTopics ?? []
+
+    related.forEach((label, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(related.length, 1)
+      const ringRadius = node.radius + 1.6
+      const position = new THREE.Vector3(
+        node.position.x + Math.cos(angle) * ringRadius,
+        node.position.y + Math.sin(angle * 1.3) * 1.2,
+        node.position.z + Math.sin(angle) * ringRadius,
+      )
+
+      children.push({
+        id: `${node.id}-${label}`,
+        label,
+        parentId: node.id,
+        position,
+        radius: 0.34,
+      })
+    })
+  })
+
+  return children
+}
+
 function App() {
+  const mountRef = useRef<HTMLDivElement | null>(null)
   const [topics, setTopics] = useState<TrendTopic[]>(() => buildFallbackTrends())
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null)
-  const [modalTopicId, setModalTopicId] = useState<string | null>(null)
-  const [rotation, setRotation] = useState({ x: -16, y: 18 })
   const [status, setStatus] = useState<'loading' | 'live' | 'fallback'>('loading')
-  const dragRef = useRef<{
-    startX: number
-    startY: number
-    baseX: number
-    baseY: number
-  } | null>(null)
+  const [modalTopicId, setModalTopicId] = useState<string | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
   const focusTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -63,7 +127,6 @@ function App() {
     async function loadTopics() {
       try {
         const response = await fetch('/api/trends')
-
         if (!response.ok) {
           throw new Error(`Failed to load topics: ${response.status}`)
         }
@@ -87,185 +150,311 @@ function App() {
 
     void loadTopics()
 
-    const autoSpin = window.setInterval(() => {
-      setRotation((currentRotation) => {
-        if (dragRef.current || modalTopicId) {
-          return currentRotation
-        }
-
-        return {
-          ...currentRotation,
-          y: currentRotation.y + 0.12,
-        }
-      })
-    }, 40)
-
     return () => {
       ignore = true
-      window.clearInterval(autoSpin)
-    }
-  }, [modalTopicId])
-
-  useEffect(() => {
-    return () => {
       if (focusTimeoutRef.current !== null) {
         window.clearTimeout(focusTimeoutRef.current)
+        focusTimeoutRef.current = null
       }
     }
   }, [])
 
-  const positionedTopics = useMemo<PositionedTopic[]>(() => {
-    return topics.map((topic, index) => {
-      const radius = orbitRadii[topic.orbit]
-      const angle = topic.angle + index * 0.12
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      const y = Math.sin(angle * 1.5) * 84 + (topic.orbit - 1) * 26
-      const size = Math.max(84, Math.min(168, 60 + topic.trafficScore * 0.78))
+  const topicMap = useMemo(() => new Map(topics.map((topic) => [topic.id, topic])), [topics])
 
-      return {
-        ...topic,
-        x,
-        y,
-        z,
-        size,
+  useEffect(() => {
+    const mount = mountRef.current
+    if (!mount) {
+      return
+    }
+
+    const scene = new THREE.Scene()
+    scene.fog = new THREE.FogExp2('#03060d', 0.028)
+
+    const camera = new THREE.PerspectiveCamera(
+      48,
+      mount.clientWidth / mount.clientHeight,
+      0.1,
+      200,
+    )
+    camera.position.set(0, 0, 32)
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setSize(mount.clientWidth, mount.clientHeight)
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    mount.innerHTML = ''
+    mount.appendChild(renderer.domElement)
+
+    const sceneRoot = new THREE.Group()
+    scene.add(sceneRoot)
+
+    const ambientLight = new THREE.AmbientLight('#f1f4ff', 1.7)
+    const keyLight = new THREE.PointLight('#e8f1ff', 36, 140, 2)
+    keyLight.position.set(0, 0, 0)
+    const rimLight = new THREE.PointLight('#d8dce6', 16, 90, 2)
+    rimLight.position.set(-18, 10, 16)
+    scene.add(ambientLight, keyLight, rimLight)
+
+    const starGeometry = new THREE.BufferGeometry()
+    const starPositions = new Float32Array(1200 * 3)
+    for (let index = 0; index < 1200; index += 1) {
+      starPositions[index * 3] = (Math.random() - 0.5) * 180
+      starPositions[index * 3 + 1] = (Math.random() - 0.5) * 120
+      starPositions[index * 3 + 2] = (Math.random() - 0.5) * 180
+    }
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+    const starField = new THREE.Points(
+      starGeometry,
+      new THREE.PointsMaterial({
+        color: '#eef2f7',
+        size: 0.1,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false,
+      }),
+    )
+    scene.add(starField)
+
+    const nodes = buildTopicNodes(topics)
+    const childNodes = buildChildNodes(nodes)
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]))
+    const clickables: ClickableNode[] = []
+
+    nodes.forEach((node) => {
+      const geometry = new THREE.SphereGeometry(node.radius, 48, 48)
+      const material = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(node.color),
+        transparent: true,
+        opacity: 0.38,
+        transmission: 0.96,
+        roughness: 0.08,
+        thickness: 1.6,
+        ior: 1.16,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.1,
+      })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.position.copy(node.position)
+      sceneRoot.add(mesh)
+      clickables.push({ mesh, topic: node })
+
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(node.radius * 1.18, 32, 32),
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(node.color),
+          transparent: true,
+          opacity: 0.06,
+          depthWrite: false,
+        }),
+      )
+      glow.position.copy(node.position)
+      sceneRoot.add(glow)
+
+      const label = makeLabelSprite(node.label, 30)
+      label.position.copy(node.position.clone().add(new THREE.Vector3(0, node.radius + 1.15, 0)))
+      sceneRoot.add(label)
+    })
+
+    childNodes.forEach((child) => {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(child.radius, 24, 24),
+        new THREE.MeshPhysicalMaterial({
+          color: '#d6dde8',
+          transparent: true,
+          opacity: 0.3,
+          transmission: 0.9,
+          roughness: 0.12,
+          thickness: 0.8,
+          ior: 1.14,
+          metalness: 0,
+          clearcoat: 0.8,
+        }),
+      )
+      mesh.position.copy(child.position)
+      sceneRoot.add(mesh)
+
+      const label = makeLabelSprite(child.label, 18)
+      label.position.copy(child.position.clone().add(new THREE.Vector3(0, child.radius + 0.42, 0)))
+      sceneRoot.add(label)
+
+      const parent = nodeMap.get(child.parentId)
+      if (parent) {
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          parent.position,
+          child.position,
+        ])
+        const line = new THREE.Line(
+          geometry,
+          new THREE.LineBasicMaterial({
+            color: '#dce3ec',
+            transparent: true,
+            opacity: 0.18,
+          }),
+        )
+        sceneRoot.add(line)
       }
     })
-  }, [topics])
 
-  const topicMap = useMemo(
-    () => new Map(positionedTopics.map((topic) => [topic.id, topic])),
-    [positionedTopics],
-  )
-
-  const childOrbs = useMemo<ChildOrb[]>(() => {
-    const nextChildren: ChildOrb[] = []
-
-    positionedTopics.forEach((topic) => {
-      const children = topic.relatedTopics ?? []
-      children.forEach((childLabel, index) => {
-        const childAngle = (Math.PI * 2 * index) / Math.max(children.length, 1)
-        const childRadius = topic.size * 0.58 + 44
-        nextChildren.push({
-          id: `${topic.id}-${childLabel}`,
-          label: childLabel,
-          parentId: topic.id,
-          x: topic.x + Math.cos(childAngle) * childRadius,
-          y: topic.y + Math.sin(childAngle) * (childRadius * 0.62),
-          z: topic.z + Math.sin(childAngle * 1.35) * 22,
-          size: Math.max(24, Math.min(40, topic.size * 0.24)),
-        })
-      })
-    })
-
-    return nextChildren
-  }, [positionedTopics])
-
-  const edges = useMemo<Edge[]>(() => {
-    const nextEdges: Edge[] = []
-    const seen = new Set<string>()
-
-    positionedTopics.forEach((topic) => {
-      topic.links?.forEach((targetId) => {
-        const target = topicMap.get(targetId)
+    const linkedPairs = new Set<string>()
+    nodes.forEach((node) => {
+      node.links?.forEach((targetId) => {
+        const target = nodeMap.get(targetId)
         if (!target) {
           return
         }
 
-        const edgeId = [topic.id, target.id].sort().join(':')
-        if (seen.has(edgeId)) {
+        const key = [node.id, target.id].sort().join(':')
+        if (linkedPairs.has(key)) {
           return
         }
 
-        seen.add(edgeId)
-
-        const dx = target.x - topic.x
-        const dy = target.y - topic.y
-        const length = Math.hypot(dx, dy)
-
-        nextEdges.push({
-          id: edgeId,
-          length,
-          angle: Math.atan2(dy, dx),
-          midX: (topic.x + target.x) / 2,
-          midY: (topic.y + target.y) / 2,
-          z: (topic.z + target.z) / 2,
-        })
+        linkedPairs.add(key)
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          node.position,
+          target.position,
+        ])
+        const line = new THREE.Line(
+          geometry,
+          new THREE.LineBasicMaterial({
+            color: '#edf1f5',
+            transparent: true,
+            opacity: 0.24,
+          }),
+        )
+        sceneRoot.add(line)
       })
     })
 
-    return nextEdges
-  }, [positionedTopics, topicMap])
+    const raycaster = new THREE.Raycaster()
+    const pointer = new THREE.Vector2()
+    const defaultCameraPosition = new THREE.Vector3(0, 0, 32)
+    const defaultLookAt = new THREE.Vector3(0, 0, 0)
+    const cameraTarget = defaultCameraPosition.clone()
+    const lookTarget = defaultLookAt.clone()
+    const currentLookAt = defaultLookAt.clone()
+    let pointerDown = { x: 0, y: 0, moved: false }
+    let isDragging = false
+    let isDisposed = false
 
-  const childEdges = useMemo<Edge[]>(() => {
-    return childOrbs
-      .map((child) => {
-        const parent = topicMap.get(child.parentId)
-        if (!parent) {
-          return null
+    function updatePointer(event: PointerEvent) {
+      const rect = renderer.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      pointerDown = { x: event.clientX, y: event.clientY, moved: false }
+      isDragging = true
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (!isDragging) {
+        return
+      }
+
+      const deltaX = event.clientX - pointerDown.x
+      const deltaY = event.clientY - pointerDown.y
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        pointerDown.moved = true
+      }
+
+      sceneRoot.rotation.y += deltaX * 0.0022
+      sceneRoot.rotation.x += deltaY * 0.0016
+      sceneRoot.rotation.x = Math.max(-0.5, Math.min(0.5, sceneRoot.rotation.x))
+      pointerDown.x = event.clientX
+      pointerDown.y = event.clientY
+    }
+
+    function handlePointerUp(event: PointerEvent) {
+      if (!pointerDown.moved) {
+        updatePointer(event)
+        raycaster.setFromCamera(pointer, camera)
+        const intersects = raycaster.intersectObjects(
+          clickables.map((entry) => entry.mesh),
+          false,
+        )
+
+        if (intersects[0]) {
+          const hit = clickables.find((entry) => entry.mesh === intersects[0].object)
+          if (hit) {
+            selectedIdRef.current = hit.topic.id
+            const focusDirection = hit.mesh.position.clone().normalize().multiplyScalar(6.6)
+            cameraTarget.copy(hit.mesh.position.clone().add(focusDirection))
+            lookTarget.copy(hit.mesh.position)
+            setModalTopicId(null)
+            if (focusTimeoutRef.current !== null) {
+              window.clearTimeout(focusTimeoutRef.current)
+            }
+            focusTimeoutRef.current = window.setTimeout(() => {
+              if (!isDisposed) {
+                setModalTopicId(hit.topic.id)
+              }
+            }, 620)
+          }
+        } else {
+          selectedIdRef.current = null
+          cameraTarget.copy(defaultCameraPosition)
+          lookTarget.copy(defaultLookAt)
+          setModalTopicId(null)
         }
+      }
 
-        const dx = child.x - parent.x
-        const dy = child.y - parent.y
-        const length = Math.hypot(dx, dy)
-
-        return {
-          id: `${child.id}:edge`,
-          length,
-          angle: Math.atan2(dy, dx),
-          midX: (child.x + parent.x) / 2,
-          midY: (child.y + parent.y) / 2,
-          z: (child.z + parent.z) / 2,
-        }
-      })
-      .filter((edge): edge is Edge => edge !== null)
-  }, [childOrbs, topicMap])
-
-  const selectedTopic = positionedTopics.find((topic) => topic.id === selectedTopicId) ?? null
-  const modalTopic = positionedTopics.find((topic) => topic.id === modalTopicId) ?? null
-  const sceneTransform = selectedTopic
-    ? `translate3d(${-selectedTopic.x * 0.54}px, ${-selectedTopic.y * 0.56}px, 180px) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(1.26)`
-    : `translate3d(0, 0, 0) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale(1)`
-
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    dragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      baseX: rotation.x,
-      baseY: rotation.y,
-    }
-  }
-
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!dragRef.current) {
-      return
+      isDragging = false
     }
 
-    const deltaX = event.clientX - dragRef.current.startX
-    const deltaY = event.clientY - dragRef.current.startY
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown)
+    renderer.domElement.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
 
-    setRotation({
-      x: Math.max(-52, Math.min(52, dragRef.current.baseX - deltaY * 0.08)),
-      y: dragRef.current.baseY + deltaX * 0.12,
-    })
-  }
-
-  function handlePointerUp() {
-    dragRef.current = null
-  }
-
-  function handleSelectTopic(topicId: string) {
-    setSelectedTopicId(topicId)
-    setModalTopicId(null)
-
-    if (focusTimeoutRef.current !== null) {
-      window.clearTimeout(focusTimeoutRef.current)
+    function handleResize() {
+      if (!mount) {
+        return
+      }
+      camera.aspect = mount.clientWidth / mount.clientHeight
+      camera.updateProjectionMatrix()
+      renderer.setSize(mount.clientWidth, mount.clientHeight)
     }
 
-    focusTimeoutRef.current = window.setTimeout(() => {
-      setModalTopicId(topicId)
-    }, 760)
-  }
+    window.addEventListener('resize', handleResize)
+
+    const clock = new THREE.Clock()
+
+    function animate() {
+      const elapsed = clock.getElapsedTime()
+      if (!isDragging && !selectedIdRef.current) {
+        sceneRoot.rotation.y += 0.0015
+      }
+
+      starField.rotation.y += 0.00035
+      starField.rotation.x = Math.sin(elapsed * 0.08) * 0.06
+
+      camera.position.lerp(cameraTarget, 0.045)
+      currentLookAt.lerp(lookTarget, 0.05)
+      camera.lookAt(currentLookAt)
+      renderer.render(scene, camera)
+    }
+
+    renderer.setAnimationLoop(animate)
+
+    return () => {
+      isDisposed = true
+      if (focusTimeoutRef.current !== null) {
+        window.clearTimeout(focusTimeoutRef.current)
+        focusTimeoutRef.current = null
+      }
+      renderer.setAnimationLoop(null)
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('resize', handleResize)
+      renderer.dispose()
+      starGeometry.dispose()
+      mount.innerHTML = ''
+    }
+  }, [topics])
+
+  const modalTopic = modalTopicId ? topicMap.get(modalTopicId) ?? null : null
 
   return (
     <main className="space-shell">
@@ -277,84 +466,17 @@ function App() {
         <span className="source-pill ghost">Korea Search Constellation</span>
       </div>
 
-      <section
-        className={`scene-viewport ${selectedTopic ? 'is-focused' : ''}`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-      >
+      <section className="scene-viewport">
         <div className="space-glow"></div>
         <div className="space-glow secondary"></div>
-        <div className="scene-core"></div>
-        <div className="scene-space" style={{ transform: sceneTransform }}>
-          {edges.map((edge) => (
-            <span
-              key={edge.id}
-              className="link-line major"
-              style={{
-                width: `${edge.length}px`,
-                transform: `translate3d(${edge.midX - edge.length / 2}px, ${edge.midY}px, ${edge.z}px) rotate(${edge.angle}rad)`,
-              }}
-            />
-          ))}
-
-          {childEdges.map((edge) => (
-            <span
-              key={edge.id}
-              className="link-line minor"
-              style={{
-                width: `${edge.length}px`,
-                transform: `translate3d(${edge.midX - edge.length / 2}px, ${edge.midY}px, ${edge.z}px) rotate(${edge.angle}rad)`,
-              }}
-            />
-          ))}
-
-          {childOrbs.map((child) => (
-            <span
-              key={child.id}
-              className="child-sphere"
-              style={{
-                '--child-size': `${child.size}px`,
-                '--child-x': `${child.x}px`,
-                '--child-y': `${child.y}px`,
-                '--child-z': `${child.z}px`,
-              } as React.CSSProperties}
-            >
-              <span>{child.label}</span>
-            </span>
-          ))}
-
-          {positionedTopics.map((topic) => (
-            <button
-              key={topic.id}
-              type="button"
-              className={`trend-sphere ${selectedTopicId === topic.id ? 'is-selected' : ''}`}
-              style={{
-                '--sphere-size': `${topic.size}px`,
-                '--sphere-x': `${topic.x}px`,
-                '--sphere-y': `${topic.y}px`,
-                '--sphere-z': `${topic.z}px`,
-                '--sphere-color': topic.color,
-              } as React.CSSProperties}
-              onClick={() => handleSelectTopic(topic.id)}
-            >
-              <span className="sphere-aura"></span>
-              <span className="sphere-sheen"></span>
-              <span className="sphere-core"></span>
-              <span className="sphere-label">
-                <strong>{topic.label}</strong>
-              </span>
-            </button>
-          ))}
-        </div>
+        <div className="scene-mount" ref={mountRef}></div>
       </section>
 
       <div
         className={`modal-backdrop ${modalTopic ? '' : 'hidden'}`}
         onClick={() => {
+          selectedIdRef.current = null
           setModalTopicId(null)
-          setSelectedTopicId(null)
         }}
       />
       <section className={`topic-modal ${modalTopic ? '' : 'hidden'}`} aria-hidden={!modalTopic}>
@@ -364,8 +486,8 @@ function App() {
               className="modal-close"
               type="button"
               onClick={() => {
+                selectedIdRef.current = null
                 setModalTopicId(null)
-                setSelectedTopicId(null)
               }}
             >
               Close
