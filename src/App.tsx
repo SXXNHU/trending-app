@@ -570,8 +570,6 @@ function App() {
       </div>
 
       <section className="scene-viewport">
-        <div className="space-glow"></div>
-        <div className="space-glow secondary"></div>
         <div className="scene-mount" ref={mountRef}></div>
       </section>
 

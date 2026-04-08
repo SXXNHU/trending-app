@@ -13,13 +13,9 @@ body {
   margin: 0;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% 54%, rgba(255, 237, 203, 0.12) 0%, rgba(221, 228, 255, 0.08) 14%, rgba(112, 126, 170, 0.04) 28%, transparent 46%),
-    radial-gradient(ellipse at 50% 54%, rgba(244, 207, 145, 0.08) 0%, transparent 18%),
-    radial-gradient(ellipse at 28% 62%, rgba(208, 218, 235, 0.05) 0%, transparent 34%),
-    radial-gradient(ellipse at 74% 38%, rgba(255, 179, 98, 0.04) 0%, transparent 26%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03), transparent 18%),
-    radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.05), transparent 12%),
-    radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.04), transparent 14%),
+    radial-gradient(circle at 18% 18%, rgba(96, 112, 154, 0.11), transparent 24%),
+    radial-gradient(circle at 84% 24%, rgba(255, 176, 106, 0.08), transparent 18%),
+    radial-gradient(circle at 52% 68%, rgba(206, 218, 255, 0.06), transparent 28%),
     linear-gradient(180deg, #010309 0%, #040811 44%, #010308 100%);
   color: var(--text);
 }
@@ -32,15 +28,13 @@ button { font: inherit; }
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(ellipse at 50% 54%, rgba(255, 248, 233, 0.22) 0 10%, rgba(209, 216, 248, 0.08) 16%, transparent 34%),
-    radial-gradient(circle at 46% 51%, rgba(255, 180, 98, 0.16) 0 1.6px, transparent 2.4px),
-    radial-gradient(circle at 66% 41%, rgba(255, 188, 110, 0.14) 0 1.2px, transparent 2px),
     radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.6) 0 1px, transparent 1.5px),
     radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 72% 30%, rgba(255, 191, 126, 0.35) 0 1px, transparent 1.8px),
     radial-gradient(circle at 22% 76%, rgba(255, 255, 255, 0.5) 0 1px, transparent 1.5px),
     radial-gradient(circle at 68% 72%, rgba(255, 255, 255, 0.38) 0 1px, transparent 1.5px),
     radial-gradient(circle at 56% 42%, rgba(255, 255, 255, 0.3) 0 1px, transparent 1.5px);
-  opacity: 0.56;
+  opacity: 0.28;
   filter: blur(0.3px);
   pointer-events: none;
 }
@@ -77,34 +71,6 @@ button { font: inherit; }
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-}
-
-.space-glow {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 520px;
-  height: 520px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 241, 214, 0.16) 0%, rgba(220, 230, 255, 0.08) 28%, rgba(255, 179, 96, 0.04) 44%, transparent 72%);
-  filter: blur(14px);
-  pointer-events: none;
-}
-.space-glow.secondary {
-  width: 1180px;
-  height: 760px;
-  background: radial-gradient(ellipse, rgba(219, 228, 255, 0.08) 0%, rgba(247, 198, 128, 0.03) 26%, transparent 66%);
-  transform: translate(-50%, -50%) rotate(-12deg);
-}
-
-.space-glow::after {
-  content: '';
-  position: absolute;
-  inset: 12% 10%;
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse at center, rgba(255, 239, 210, 0.12) 0%, rgba(214, 223, 244, 0.05) 22%, transparent 58%);
-  filter: blur(30px);
 }
 
 .scene-mount {
