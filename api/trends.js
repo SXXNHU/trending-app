@@ -1,24 +1,12 @@
-﻿import {
-  buildFallbackTrends,
-  trendTopicSeeds,
-  type TrendTopic,
-} from '../src/data/trendItems'
-
-type DataLabItem = {
-  title: string
-  data: Array<{
-    period: string
-    ratio: number
-  }>
-}
+﻿import { buildFallbackTrends, trendTopicSeeds } from '../src/data/trendItems.js'
 
 const anchorGroup = {
   groupName: '기준축',
   keywords: ['오늘 날씨', '날씨'],
 }
 
-function chunkTopics<T>(items: T[], size: number) {
-  const chunks: T[][] = []
+function chunkTopics(items, size) {
+  const chunks = []
 
   for (let index = 0; index < items.length; index += size) {
     chunks.push(items.slice(index, index + size))
@@ -27,11 +15,15 @@ function chunkTopics<T>(items: T[], size: number) {
   return chunks
 }
 
-function getLatestRatio(item?: DataLabItem) {
-  return item?.data.at(-1)?.ratio ?? 0
+function getLatestRatio(item) {
+  if (!item || !item.data || item.data.length === 0) {
+    return 0
+  }
+
+  return item.data[item.data.length - 1].ratio ?? 0
 }
 
-async function fetchBatch(topics: typeof trendTopicSeeds) {
+async function fetchBatch(topics) {
   const clientId = process.env.NAVER_CLIENT_ID
   const clientSecret = process.env.NAVER_CLIENT_SECRET
 
@@ -70,7 +62,7 @@ async function fetchBatch(topics: typeof trendTopicSeeds) {
     throw new Error(`Naver DataLab request failed: ${response.status}`)
   }
 
-  const json = (await response.json()) as { results?: DataLabItem[] }
+  const json = await response.json()
   const results = json.results ?? []
   const anchorRatio = Math.max(getLatestRatio(results[0]), 1)
 
@@ -88,14 +80,14 @@ async function fetchBatch(topics: typeof trendTopicSeeds) {
   })
 }
 
-async function fetchNaverTrends(): Promise<TrendTopic[]> {
+async function fetchNaverTrends() {
   const batches = chunkTopics(trendTopicSeeds, 4)
   const responses = await Promise.all(batches.map((batch) => fetchBatch(batch)))
 
   return responses.flat().sort((left, right) => right.trafficScore - left.trafficScore)
 }
 
-export default async function handler(_: unknown, response: any) {
+export default async function handler(_, response) {
   try {
     const topics = await fetchNaverTrends()
 
@@ -110,10 +102,7 @@ export default async function handler(_: unknown, response: any) {
     response.status(200).json({
       mode: 'fallback',
       sourceLabel: '데모 트렌드',
-      reason:
-        error instanceof Error
-          ? error.message
-          : 'Fallback data returned because live trend data is unavailable.',
+      reason: error instanceof Error ? error.message : 'Fallback data returned because live trend data is unavailable.',
       topics: buildFallbackTrends(),
     })
   }
