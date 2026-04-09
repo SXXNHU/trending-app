@@ -62,7 +62,8 @@ function formatEvidenceSource(source: 'NEWS' | 'BLOG' | 'CAFE') {
 function makeLabelSprite(text: string, fontSize: number) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
-  const fontFamily = '"HSJiphyeongseon", "HS 지평선", "HS지평선체", "SUIT Variable", "Pretendard Variable", sans-serif'
+  const fontFamily =
+    '"Mona12", "HSJiphyeongseon", "HS 지평선", "HS지평선체", "SUIT Variable", "Pretendard Variable", sans-serif'
 
   if (!context) {
     return new THREE.Sprite()
