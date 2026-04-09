@@ -128,10 +128,51 @@ async function fetchSearchChannel({ clientId, clientSecret, query, path, source 
     .filter((item) => item.title || item.snippet)
 }
 
+function collectNewsItems(node, items = []) {
+  if (Array.isArray(node)) {
+    node.forEach((value) => collectNewsItems(value, items))
+    return items
+  }
+
+  if (!node || typeof node !== 'object') {
+    return items
+  }
+
+  if (node.templateId === 'newsItem' && node.props?.title && node.props?.titleHref) {
+    items.push({
+      source: 'NEWS',
+      title: stripHtml(node.props.title),
+      snippet: stripHtml(node.props.content ?? ''),
+      link: node.props.titleHref,
+      publishedAt: undefined,
+    })
+  }
+
+  Object.values(node).forEach((value) => collectNewsItems(value, items))
+  return items
+}
+
+async function fetchNaverNewsFragmentEvidence(query) {
+  const encodedQuery = encodeURIComponent(query)
+  const response = await fetch(
+    `https://s.search.naver.com/p/newssearch/3/api/tab/more?query=${encodedQuery}&where=news&ssc=tab.news.all&sort=0&start=1`,
+  )
+
+  if (!response.ok) {
+    return []
+  }
+
+  const json = await response.json()
+  const collection = json.collection ?? []
+  const items = collectNewsItems(collection)
+
+  return items.filter((item) => item.title || item.snippet).slice(0, 5)
+}
+
 async function fetchEvidence(topic, clientId, clientSecret) {
   const query = topic.keywords[0] ?? topic.label
 
-  const [news, blogs, cafes] = await Promise.all([
+  const [newsApi, blogs, cafes, newsFragment] = await Promise.all([
     fetchSearchChannel({
       clientId,
       clientSecret,
@@ -153,33 +194,32 @@ async function fetchEvidence(topic, clientId, clientSecret) {
       path: 'cafearticle',
       source: 'CAFE',
     }),
+    fetchNaverNewsFragmentEvidence(query),
   ])
 
+  const news = newsFragment.length ? newsFragment : newsApi
   return [...news, ...blogs, ...cafes].slice(0, 5)
 }
 
 function buildIssueReason(topic, evidence) {
-  if (!evidence.length) {
+  const newsItems = evidence.filter((item) => item.source === 'NEWS')
+
+  if (!newsItems.length) {
     return topic.issueReason
   }
 
-  const newsItem = evidence.find((item) => item.source === 'NEWS')
-  const communityItem = evidence.find((item) => item.source !== 'NEWS')
-  const headline = evidence[0]
   const reasons = []
+  const first = newsItems[0]
+  const second = newsItems[1]
 
-  if (headline?.title) {
-    reasons.push(
-      `${headline.source === 'NEWS' ? '기사' : '커뮤니티'}에서는 "${headline.title}" 같은 흐름이 먼저 크게 보이고 있어요.`,
-    )
+  reasons.push(`네이버 기사에서는 "${first.title}" 같은 흐름이 먼저 크게 보이고 있어요.`)
+
+  if (first.snippet) {
+    reasons.push(`핵심 맥락은 ${first.snippet} 같은 내용으로 모이고 있습니다.`)
   }
 
-  if (newsItem?.snippet) {
-    reasons.push(`뉴스 반응은 ${newsItem.snippet} 같은 맥락으로 이어지고 있습니다.`)
-  }
-
-  if (communityItem?.snippet) {
-    reasons.push(`블로그·카페 쪽에서는 ${communityItem.snippet} 같은 포인트가 같이 퍼지는 중이에요.`)
+  if (second?.title) {
+    reasons.push(`비슷한 시점의 다른 기사들도 "${second.title}" 같은 포인트를 함께 짚고 있어요.`)
   }
 
   return reasons.slice(0, 3)
