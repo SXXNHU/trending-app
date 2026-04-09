@@ -59,6 +59,14 @@ function formatEvidenceSource(source: 'NEWS' | 'BLOG' | 'CAFE') {
   return 'CAFE'
 }
 
+function openEvidenceLink(link: string) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.open(link, '_blank', 'noopener,noreferrer')
+}
+
 function makeLabelSprite(text: string, fontSize: number) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
@@ -509,6 +517,7 @@ function App() {
     lookTargetRef.current = lookTarget
     let pointerDown = { x: 0, y: 0, moved: false }
     let isDragging = false
+    let activePointerId: number | null = null
     let isDisposed = false
 
     function updatePointer(event: PointerEvent) {
@@ -520,6 +529,7 @@ function App() {
     function handlePointerDown(event: PointerEvent) {
       pointerDown = { x: event.clientX, y: event.clientY, moved: false }
       isDragging = true
+      activePointerId = event.pointerId
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -542,6 +552,10 @@ function App() {
     }
 
     function handlePointerUp(event: PointerEvent) {
+      if (activePointerId === null || event.pointerId !== activePointerId) {
+        return
+      }
+
       if (!pointerDown.moved) {
         updatePointer(event)
         raycaster.setFromCamera(pointer, camera)
@@ -577,6 +591,7 @@ function App() {
       }
 
       isDragging = false
+      activePointerId = null
     }
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
@@ -717,6 +732,11 @@ function App() {
                     href={item.link}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      event.preventDefault()
+                      openEvidenceLink(item.link)
+                    }}
                   >
                     <span className="evidence-source">{formatEvidenceSource(item.source)}</span>
                     <strong>{item.title}</strong>
