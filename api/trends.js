@@ -128,27 +128,44 @@ async function fetchSearchChannel({ clientId, clientSecret, query, path, source 
     .filter((item) => item.title || item.snippet)
 }
 
-function collectNewsItems(node, items = []) {
-  if (Array.isArray(node)) {
-    node.forEach((value) => collectNewsItems(value, items))
-    return items
-  }
+function decodeScriptString(value = '') {
+  return value
+    .replace(/\\u003c/g, '<')
+    .replace(/\\u003e/g, '>')
+    .replace(/\\u0026/g, '&')
+    .replace(/\\u0027/g, "'")
+    .replace(/\\u0026quot;/g, '"')
+    .replace(/\\"/g, '"')
+}
 
-  if (!node || typeof node !== 'object') {
-    return items
-  }
+function extractNewsItemsFromScript(script) {
+  const decoded = decodeScriptString(script)
+  const chunks = decoded.split('"templateId":"newsItem"')
+  const items = []
 
-  if (node.templateId === 'newsItem' && node.props?.title && node.props?.titleHref) {
+  for (let index = 0; index < chunks.length - 1; index += 1) {
+    const chunk = chunks[index]
+    const titleMatch = chunk.match(/"title":"([^"]+)"/g)
+    const hrefMatch = chunk.match(/"titleHref":"([^"]+)"/g)
+    const contentMatch = chunk.match(/"content":"([^"]*)"/g)
+
+    const rawTitle = titleMatch?.[titleMatch.length - 1]?.match(/"title":"([^"]+)"/)?.[1]
+    const rawHref = hrefMatch?.[hrefMatch.length - 1]?.match(/"titleHref":"([^"]+)"/)?.[1]
+    const rawContent = contentMatch?.[contentMatch.length - 1]?.match(/"content":"([^"]*)"/)?.[1]
+
+    if (!rawTitle || !rawHref) {
+      continue
+    }
+
     items.push({
       source: 'NEWS',
-      title: stripHtml(node.props.title),
-      snippet: stripHtml(node.props.content ?? ''),
-      link: node.props.titleHref,
+      title: stripHtml(rawTitle),
+      snippet: stripHtml(rawContent ?? ''),
+      link: stripHtml(rawHref),
       publishedAt: undefined,
     })
   }
 
-  Object.values(node).forEach((value) => collectNewsItems(value, items))
   return items
 }
 
@@ -163,8 +180,8 @@ async function fetchNaverNewsFragmentEvidence(query) {
   }
 
   const json = await response.json()
-  const collection = json.collection ?? []
-  const items = collectNewsItems(collection)
+  const script = json.collection?.[0]?.script ?? ''
+  const items = extractNewsItemsFromScript(script)
 
   return items.filter((item) => item.title || item.snippet).slice(0, 5)
 }
