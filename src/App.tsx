@@ -59,14 +59,6 @@ function formatEvidenceSource(source: 'NEWS' | 'BLOG' | 'CAFE') {
   return 'CAFE'
 }
 
-function openEvidenceLink(link: string) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window.open(link, '_blank', 'noopener,noreferrer')
-}
-
 function makeLabelSprite(text: string, fontSize: number) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
@@ -696,7 +688,13 @@ function App() {
         className={`modal-backdrop ${modalTopic ? '' : 'hidden'}`}
         onClick={closeModalKeepOrbitView}
       />
-      <section className={`topic-modal ${modalTopic ? '' : 'hidden'}`} aria-hidden={!modalTopic}>
+      <section
+        className={`topic-modal ${modalTopic ? '' : 'hidden'}`}
+        aria-hidden={!modalTopic}
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+      >
         {modalTopic ? (
           <>
             <button
@@ -731,12 +729,7 @@ function App() {
                     className="evidence-card"
                     href={item.link}
                     target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      event.preventDefault()
-                      openEvidenceLink(item.link)
-                    }}
+                    rel="noopener noreferrer"
                   >
                     <span className="evidence-source">{formatEvidenceSource(item.source)}</span>
                     <strong>{item.title}</strong>
