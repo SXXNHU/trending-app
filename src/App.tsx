@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 import { buildFallbackTrends, type TrendTopic } from './data/trendItems'
@@ -20,6 +20,14 @@ type ClickableNode = {
   mesh: THREE.Mesh
   topic: TrendTopic
   focusPoint: THREE.Vector3
+}
+
+type OrbitalRing = {
+  mesh: THREE.Mesh
+  geo: THREE.TorusGeometry
+  mat: THREE.MeshBasicMaterial
+  rotAxis: THREE.Vector3
+  rotSpeed: number
 }
 
 const orbitRadii = [11, 16, 22]
@@ -59,7 +67,7 @@ function formatEvidenceSource(source: 'NEWS' | 'BLOG' | 'CAFE') {
   return 'CAFE'
 }
 
-function makeLabelSprite(text: string, fontSize: number) {
+function makeLabelSprite(text: string, fontSize: number, isMain = false) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   const fontFamily =
@@ -70,17 +78,32 @@ function makeLabelSprite(text: string, fontSize: number) {
   }
 
   context.font = `${fontSize}px ${fontFamily}`
-  const width = Math.ceil(context.measureText(text).width + 28)
-  const height = Math.ceil(fontSize + 22)
+  const width = Math.ceil(context.measureText(text).width + 32)
+  const height = Math.ceil(fontSize + 24)
   canvas.width = width
   canvas.height = height
 
   context.clearRect(0, 0, width, height)
   context.font = `${fontSize}px ${fontFamily}`
-  context.fillStyle = 'rgba(240,244,250,0.9)'
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  context.fillText(text, width / 2, height / 2)
+
+  if (isMain) {
+    // Outer neon glow
+    context.shadowColor = '#00e5ff'
+    context.shadowBlur = 18
+    context.fillStyle = 'rgba(0, 200, 255, 0.22)'
+    context.fillText(text, width / 2, height / 2)
+    // Bright inner text
+    context.shadowBlur = 9
+    context.fillStyle = 'rgba(220, 245, 255, 0.97)'
+    context.fillText(text, width / 2, height / 2)
+  } else {
+    context.shadowColor = '#48cae4'
+    context.shadowBlur = 11
+    context.fillStyle = 'rgba(180, 225, 245, 0.88)'
+    context.fillText(text, width / 2, height / 2)
+  }
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.needsUpdate = true
@@ -175,25 +198,39 @@ function createInstancedSphereLayers(
 }
 
 function createAccentOrb() {
-  const isWarm = Math.random() > 0.35
-  const hue = isWarm ? 28 + Math.random() * 14 : 210 + Math.random() * 18
-  const saturation = isWarm ? 0.48 + Math.random() * 0.34 : 0.04 + Math.random() * 0.14
-  const lightness = isWarm ? 0.72 + Math.random() * 0.18 : 0.84 + Math.random() * 0.12
-  const color = new THREE.Color().setHSL(hue / 360, saturation, Math.min(lightness, 0.97))
+  const typeRoll = Math.random()
+  let hue: number
+  let sat: number
+  let lit: number
 
-  const radius = isWarm ? 0.42 + Math.random() * 1.36 : 0.24 + Math.random() * 1.02
+  if (typeRoll > 0.62) {
+    hue = 185 + Math.random() * 28
+    sat = 0.78 + Math.random() * 0.22
+    lit = 0.48 + Math.random() * 0.24
+  } else if (typeRoll > 0.28) {
+    hue = 215 + Math.random() * 40
+    sat = 0.62 + Math.random() * 0.32
+    lit = 0.42 + Math.random() * 0.3
+  } else {
+    hue = 265 + Math.random() * 50
+    sat = 0.68 + Math.random() * 0.32
+    lit = 0.38 + Math.random() * 0.28
+  }
+
+  const color = new THREE.Color().setHSL(hue / 360, sat, Math.min(lit, 0.9))
+  const radius = 0.26 + Math.random() * 1.14
   const geometry = new THREE.SphereGeometry(radius, 18, 18)
   const material = new THREE.MeshPhysicalMaterial({
     color,
     transparent: true,
-    opacity: isWarm ? 0.34 + Math.random() * 0.4 : 0.12 + Math.random() * 0.36,
-    transmission: 0.85 + Math.random() * 0.12,
-    roughness: 0.06 + Math.random() * 0.18,
-    thickness: 0.4 + Math.random() * 1.6,
-    ior: 1.1 + Math.random() * 0.1,
+    opacity: 0.08 + Math.random() * 0.24,
+    transmission: 0.8 + Math.random() * 0.16,
+    roughness: 0.02 + Math.random() * 0.08,
+    thickness: 0.3 + Math.random() * 1.4,
+    ior: 1.12 + Math.random() * 0.14,
     metalness: 0,
-    clearcoat: 0.6 + Math.random() * 0.4,
-    clearcoatRoughness: 0.04 + Math.random() * 0.18,
+    clearcoat: 0.72 + Math.random() * 0.28,
+    clearcoatRoughness: 0.02 + Math.random() * 0.1,
     depthWrite: false,
   })
   const mesh = new THREE.Mesh(geometry, material)
@@ -285,7 +322,7 @@ function App() {
     }
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.FogExp2('#03060d', 0.028)
+    scene.fog = new THREE.FogExp2('#000208', 0.022)
     const viewportPreset = getViewportPreset(mount.clientWidth)
 
     const camera = new THREE.PerspectiveCamera(
@@ -307,18 +344,20 @@ function App() {
     sceneRoot.scale.setScalar(viewportPreset.sceneScale)
     scene.add(sceneRoot)
 
-    const galaxyGroup = new THREE.Group()
-    sceneRoot.add(galaxyGroup)
+    const fieldGroup = new THREE.Group()
+    sceneRoot.add(fieldGroup)
 
-    const ambientLight = new THREE.AmbientLight('#f1f4ff', 1.7)
-    const keyLight = new THREE.PointLight('#e8f1ff', 36, 140, 2)
+    // Cyberpunk neon lighting
+    const ambientLight = new THREE.AmbientLight('#091828', 2.6)
+    const keyLight = new THREE.PointLight('#00d4ff', 52, 155, 2)
     keyLight.position.set(0, 0, 0)
-    const rimLight = new THREE.PointLight('#d8dce6', 16, 90, 2)
+    const rimLight = new THREE.PointLight('#6600cc', 14, 90, 2)
     rimLight.position.set(-18, 10, 16)
-    const warmLight = new THREE.PointLight('#ffb36b', 9, 80, 2)
-    warmLight.position.set(8, -4, 10)
-    scene.add(ambientLight, keyLight, rimLight, warmLight)
+    const accentLight = new THREE.PointLight('#0033ff', 8, 70, 2)
+    accentLight.position.set(8, -4, 10)
+    scene.add(ambientLight, keyLight, rimLight, accentLight)
 
+    // Data node particles (background field)
     const starLayers = createInstancedSphereLayers(
       [26, 44, 20],
       0.14,
@@ -333,88 +372,146 @@ function App() {
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.58 ? '#ffab57' : Math.random() > 0.28 ? '#dbe3ff' : '#ffffff',
+          Math.random() > 0.55 ? '#00e5ff' : Math.random() > 0.35 ? '#4da6ff' : '#e0f0ff',
         ),
-      [0.12, 0.38, 0.88],
+      [0.14, 0.42, 0.88],
     )
     starLayers.forEach((layer) => sceneRoot.add(layer.mesh))
 
-    const galaxyLayers = createInstancedSphereLayers(
+    // Network field particles (spherical distribution)
+    const networkLayers = createInstancedSphereLayers(
       [70, 110, 56],
       0.18,
       (helper) => {
-        const armAngle = Math.random() * Math.PI * 2
-        const radius = Math.pow(Math.random(), 0.86) * 108
-        const spiral = armAngle + radius * 0.1
-        const spread = (Math.random() - 0.5) * 8.4
-
+        const theta = Math.random() * Math.PI * 2
+        const phi = Math.acos(2 * Math.random() - 1)
+        const r = 14 + Math.pow(Math.random(), 0.72) * 95
         helper.position.set(
-          Math.cos(spiral) * radius + spread,
-          (Math.random() - 0.5) * 1.8,
-          Math.sin(spiral) * radius * 0.14 + spread * 0.92,
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.cos(phi) * 0.35,
+          r * Math.sin(phi) * Math.sin(theta),
         )
-        const scale = 0.6 + Math.random() * 2.8
+        const scale = 0.5 + Math.random() * 2.4
         helper.scale.setScalar(scale)
       },
       () =>
         new THREE.Color(
-          Math.random() > 0.52 ? '#ffa24c' : Math.random() > 0.24 ? '#d7ddff' : '#ffffff',
+          Math.random() > 0.58 ? '#00b4d8' : Math.random() > 0.3 ? '#0077b6' : '#48cae4',
         ),
-      [0.08, 0.22, 0.5],
+      [0.1, 0.26, 0.54],
     )
-    galaxyLayers.forEach((layer) => galaxyGroup.add(layer.mesh))
+    networkLayers.forEach((layer) => fieldGroup.add(layer.mesh))
 
     const accentOrbs = Array.from({ length: 26 }, () => createAccentOrb())
     accentOrbs.forEach((orb) => sceneRoot.add(orb.mesh))
 
+    // Electric core
     const coreGlow = new THREE.Mesh(
       new THREE.SphereGeometry(2.4, 32, 32),
       new THREE.MeshBasicMaterial({
-        color: '#fff3da',
+        color: '#00c8ff',
         transparent: true,
-        opacity: 0.1,
+        opacity: 0.07,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }),
     )
-    galaxyGroup.add(coreGlow)
+    fieldGroup.add(coreGlow)
+
+    // Animated laser connection line materials (shared, dashes animate in animate())
+    const linkLineMaterial = new THREE.LineDashedMaterial({
+      color: '#00e5ff',
+      transparent: true,
+      opacity: 0.34,
+      dashSize: 0.7,
+      gapSize: 2.2,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+
+    const childLineMaterial = new THREE.LineDashedMaterial({
+      color: '#0096c7',
+      transparent: true,
+      opacity: 0.2,
+      dashSize: 0.32,
+      gapSize: 1.4,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
 
     const nodes = buildTopicNodes(topics)
     const childNodes = buildChildNodes(nodes)
     const nodeMap = new Map(nodes.map((node) => [node.id, node]))
     const clickables: ClickableNode[] = []
+    const orbitalRings: OrbitalRing[] = []
 
     nodes.forEach((node) => {
       const geometry = new THREE.SphereGeometry(node.radius, 48, 48)
+      const nodeColor = new THREE.Color(node.color).lerp(new THREE.Color('#00c8ff'), 0.52)
       const material = new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(node.color),
+        color: nodeColor,
         transparent: true,
-        opacity: 0.38,
-        transmission: 0.96,
-        roughness: 0.08,
-        thickness: 1.6,
-        ior: 1.16,
+        opacity: 0.28,
+        transmission: 0.94,
+        roughness: 0.04,
+        thickness: 1.5,
+        ior: 1.2,
         metalness: 0,
         clearcoat: 1,
-        clearcoatRoughness: 0.1,
+        clearcoatRoughness: 0.06,
       })
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.copy(node.position)
       sceneRoot.add(mesh)
       clickables.push({ mesh, topic: node, focusPoint: node.position.clone() })
 
+      // Neon additive glow halo
       const glow = new THREE.Mesh(
-        new THREE.SphereGeometry(node.radius * 1.18, 32, 32),
+        new THREE.SphereGeometry(node.radius * 1.22, 32, 32),
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color(node.color),
+          color: new THREE.Color(node.color).lerp(new THREE.Color('#00e5ff'), 0.75),
           transparent: true,
-          opacity: 0.06,
+          opacity: 0.07,
           depthWrite: false,
+          blending: THREE.AdditiveBlending,
         }),
       )
       glow.position.copy(node.position)
       sceneRoot.add(glow)
 
-      const label = makeLabelSprite(node.label, viewportPreset.mainLabelFont)
+      // Atomic orbital rings
+      const ringDefs = [
+        { rm: 1.55, col: '#00e5ff', op: 0.42, spd: 0.007 + Math.random() * 0.009 },
+        { rm: 1.96, col: '#7b2ff7', op: 0.28, spd: -(0.005 + Math.random() * 0.007) },
+      ]
+
+      ringDefs.forEach((def, ri) => {
+        const geo = new THREE.TorusGeometry(node.radius * def.rm, 0.022, 8, 56)
+        const mat = new THREE.MeshBasicMaterial({
+          color: def.col,
+          transparent: true,
+          opacity: def.op,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+        const ring = new THREE.Mesh(geo, mat)
+        ring.position.copy(node.position)
+        ring.rotation.set(
+          Math.PI / 4 + ri * (Math.PI / 5),
+          Math.random() * Math.PI,
+          ri * (Math.PI / 6),
+        )
+        sceneRoot.add(ring)
+        orbitalRings.push({
+          mesh: ring,
+          geo,
+          mat,
+          rotAxis: new THREE.Vector3(0.1 * (ri === 0 ? 1 : -1), 1, 0.2).normalize(),
+          rotSpeed: def.spd,
+        })
+      })
+
+      const label = makeLabelSprite(node.label, viewportPreset.mainLabelFont, true)
       label.position.copy(node.position.clone().add(new THREE.Vector3(0, node.radius + 1.15, 0)))
       sceneRoot.add(label)
     })
@@ -423,15 +520,15 @@ function App() {
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(child.radius, 24, 24),
         new THREE.MeshPhysicalMaterial({
-          color: '#d6dde8',
+          color: '#48cae4',
           transparent: true,
-          opacity: 0.3,
-          transmission: 0.9,
-          roughness: 0.12,
-          thickness: 0.8,
-          ior: 1.14,
+          opacity: 0.38,
+          transmission: 0.88,
+          roughness: 0.06,
+          thickness: 0.7,
+          ior: 1.15,
           metalness: 0,
-          clearcoat: 0.8,
+          clearcoat: 0.85,
         }),
       )
       mesh.position.copy(child.position)
@@ -446,25 +543,16 @@ function App() {
         })
       }
 
-      const label = makeLabelSprite(child.label, viewportPreset.childLabelFont)
+      const label = makeLabelSprite(child.label, viewportPreset.childLabelFont, false)
       label.position.copy(child.position.clone().add(new THREE.Vector3(0, child.radius + 0.42, 0)))
       sceneRoot.add(label)
 
       const parent = nodeMap.get(child.parentId)
       if (parent) {
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          parent.position,
-          child.position,
-        ])
-        const line = new THREE.Line(
-          geometry,
-          new THREE.LineBasicMaterial({
-            color: '#dce3ec',
-            transparent: true,
-            opacity: 0.18,
-          }),
-        )
-        sceneRoot.add(line)
+        const geo = new THREE.BufferGeometry().setFromPoints([parent.position, child.position])
+        const childLine = new THREE.Line(geo, childLineMaterial)
+        childLine.computeLineDistances()
+        sceneRoot.add(childLine)
       }
     })
 
@@ -482,19 +570,10 @@ function App() {
         }
 
         linkedPairs.add(key)
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          node.position,
-          target.position,
-        ])
-        const line = new THREE.Line(
-          geometry,
-          new THREE.LineBasicMaterial({
-            color: '#edf1f5',
-            transparent: true,
-            opacity: 0.24,
-          }),
-        )
-        sceneRoot.add(line)
+        const geo = new THREE.BufferGeometry().setFromPoints([node.position, target.position])
+        const linkLine = new THREE.Line(geo, linkLineMaterial)
+        linkLine.computeLineDistances()
+        sceneRoot.add(linkLine)
       })
     })
 
@@ -620,15 +699,25 @@ function App() {
         layer.mesh.rotation.y += 0.00005 + index * 0.000015
         layer.mesh.rotation.x = Math.sin(elapsed * (0.035 + index * 0.01)) * 0.03
       })
-      galaxyLayers.forEach((layer, index) => {
-        layer.mesh.rotation.y += 0.00018 + index * 0.00004
-        layer.mesh.rotation.x = Math.sin(elapsed * (0.045 + index * 0.014)) * 0.01
+      networkLayers.forEach((layer, index) => {
+        layer.mesh.rotation.y += 0.00022 + index * 0.00005
+        layer.mesh.rotation.x = Math.sin(elapsed * (0.055 + index * 0.016)) * 0.012
       })
       accentOrbs.forEach((orb, index) => {
         orb.mesh.rotation.y += 0.0003 + index * 0.000008
         orb.mesh.position.y += Math.sin(elapsed * (0.22 + index * 0.013)) * 0.0025
       })
-      coreGlow.scale.setScalar(1 + Math.sin(elapsed * 0.8) * 0.03)
+
+      // Rotate atomic orbital rings
+      orbitalRings.forEach((ring) => {
+        ring.mesh.rotateOnAxis(ring.rotAxis, ring.rotSpeed)
+      })
+
+      // Animate laser data flow along connection lines
+      ;(linkLineMaterial as THREE.LineDashedMaterial & { dashOffset: number }).dashOffset -= 0.018
+      ;(childLineMaterial as THREE.LineDashedMaterial & { dashOffset: number }).dashOffset -= 0.012
+
+      coreGlow.scale.setScalar(1 + Math.sin(elapsed * 1.2) * 0.04)
 
       camera.position.lerp(cameraTarget, 0.045)
       currentLookAt.lerp(lookTarget, 0.05)
@@ -654,7 +743,7 @@ function App() {
         layer.geometry.dispose()
         layer.material.dispose()
       })
-      galaxyLayers.forEach((layer) => {
+      networkLayers.forEach((layer) => {
         layer.geometry.dispose()
         layer.material.dispose()
       })
@@ -662,6 +751,12 @@ function App() {
         orb.geometry.dispose()
         orb.material.dispose()
       })
+      orbitalRings.forEach((ring) => {
+        ring.geo.dispose()
+        ring.mat.dispose()
+      })
+      linkLineMaterial.dispose()
+      childLineMaterial.dispose()
       cameraTargetRef.current = null
       lookTargetRef.current = null
       mount.innerHTML = ''
@@ -673,11 +768,13 @@ function App() {
   return (
     <main className="space-shell">
       <div className="space-noise"></div>
+      <div className="cyber-grid"></div>
       <div className="space-hud">
         <span className={`source-pill is-${status}`}>
-          {status === 'live' ? 'NAVER LIVE' : status === 'loading' ? 'SYNCING' : 'DEMO MODE'}
+          <span className="status-dot"></span>
+          {status === 'live' ? 'NAVER LIVE' : status === 'loading' ? 'SYNCING...' : 'DEMO // OFFLINE'}
         </span>
-        <span className="source-pill ghost">Korea Search Constellation</span>
+        <span className="source-pill ghost">KR NEURAL SIGNAL</span>
       </div>
 
       <section className="scene-viewport">
@@ -702,7 +799,7 @@ function App() {
               type="button"
               onClick={closeModalKeepOrbitView}
             >
-              Close
+              CLOSE
             </button>
             <p className="modal-kicker">{modalTopic.category} · {modalTopic.sourceLabel}</p>
             <h2>{modalTopic.label}</h2>
