@@ -591,6 +591,36 @@ function App() {
     let activePointerId: number | null = null
     let isDisposed = false
 
+    // Zoom state
+    const MIN_ZOOM = 10
+    const MAX_ZOOM = 80
+    let zoomDistance = viewportPreset.cameraDistance
+    const activePointers = new Map<number, { x: number; y: number }>()
+    let isPinching = false
+    let pinchStartDistance = 0
+    let pinchZoomStart = 0
+
+    function getPinchDistance() {
+      const pts = Array.from(activePointers.values())
+      const dx = pts[0].x - pts[1].x
+      const dy = pts[0].y - pts[1].y
+      return Math.sqrt(dx * dx + dy * dy)
+    }
+
+    function applyZoom(newDistance: number) {
+      zoomDistance = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newDistance))
+      defaultCameraPosition.set(0, 0, zoomDistance)
+      if (!selectedIdRef.current) {
+        cameraTarget.copy(defaultCameraPosition)
+      }
+    }
+
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault()
+      const delta = event.deltaY > 0 ? 1 : -1
+      applyZoom(zoomDistance + delta * 2.2)
+    }
+
     function updatePointer(event: PointerEvent) {
       const rect = renderer.domElement.getBoundingClientRect()
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -598,13 +628,35 @@ function App() {
     }
 
     function handlePointerDown(event: PointerEvent) {
-      pointerDown = { x: event.clientX, y: event.clientY, moved: false }
-      isDragging = true
-      activePointerId = event.pointerId
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+      if (activePointers.size === 2) {
+        // Two fingers on screen — start pinch zoom
+        isDragging = false
+        activePointerId = null
+        isPinching = true
+        pinchStartDistance = getPinchDistance()
+        pinchZoomStart = zoomDistance
+      } else if (activePointers.size === 1) {
+        // Single pointer — start drag / click
+        pointerDown = { x: event.clientX, y: event.clientY, moved: false }
+        isDragging = true
+        activePointerId = event.pointerId
+      }
     }
 
     function handlePointerMove(event: PointerEvent) {
-      if (!isDragging) {
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+      if (isPinching && activePointers.size >= 2) {
+        const currentDist = getPinchDistance()
+        if (currentDist > 0) {
+          applyZoom(pinchZoomStart * (pinchStartDistance / currentDist))
+        }
+        return
+      }
+
+      if (!isDragging || event.pointerId !== activePointerId) {
         return
       }
 
@@ -623,6 +675,17 @@ function App() {
     }
 
     function handlePointerUp(event: PointerEvent) {
+      activePointers.delete(event.pointerId)
+
+      if (isPinching) {
+        if (activePointers.size < 2) {
+          isPinching = false
+          isDragging = false
+          activePointerId = null
+        }
+        return
+      }
+
       if (activePointerId === null || event.pointerId !== activePointerId) {
         return
       }
@@ -668,6 +731,7 @@ function App() {
     renderer.domElement.addEventListener('pointerdown', handlePointerDown)
     renderer.domElement.addEventListener('pointermove', handlePointerMove)
     window.addEventListener('pointerup', handlePointerUp)
+    renderer.domElement.addEventListener('wheel', handleWheel, { passive: false })
 
     function handleResize() {
       if (!mount) {
@@ -679,7 +743,10 @@ function App() {
       camera.updateProjectionMatrix()
       renderer.setSize(mount.clientWidth, mount.clientHeight)
       sceneRoot.scale.setScalar(activePreset.sceneScale)
-      defaultCameraPosition.set(0, 0, activePreset.cameraDistance)
+      // Rebase zoom around new preset distance, preserving relative offset
+      const zoomOffset = zoomDistance - viewportPreset.cameraDistance
+      zoomDistance = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, activePreset.cameraDistance + zoomOffset))
+      defaultCameraPosition.set(0, 0, zoomDistance)
       if (!selectedIdRef.current) {
         cameraTarget.copy(defaultCameraPosition)
       }
@@ -737,6 +804,7 @@ function App() {
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown)
       renderer.domElement.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
+      renderer.domElement.removeEventListener('wheel', handleWheel)
       window.removeEventListener('resize', handleResize)
       renderer.dispose()
       starLayers.forEach((layer) => {
