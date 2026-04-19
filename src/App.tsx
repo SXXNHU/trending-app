@@ -230,7 +230,7 @@ function App() {
 
       <OnboardingOverlay
         phase={onboarding.phase}
-        showHint={onboarding.showHint}
+        visibleHintIds={onboarding.visibleHintIds}
         onStart={onboarding.startIntro}
         onSkip={onboarding.skipIntro}
         onDismissHint={onboarding.dismissHint}

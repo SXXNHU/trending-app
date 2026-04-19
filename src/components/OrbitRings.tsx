@@ -7,9 +7,9 @@ export function createOrbitRings(sceneRoot: THREE.Group, radii: number[]) {
 
   const rings = radii.map((radius, index) => {
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(radius, 0.045, 12, 120),
+      new THREE.TorusGeometry(radius, 0.018, 10, 120),
       new THREE.MeshBasicMaterial({
-        color: index === 1 ? '#00d9ff' : '#3f92ff',
+        color: index === 1 ? '#a7ecff' : '#8fc9ff',
         transparent: true,
         opacity: 0,
         depthWrite: false,

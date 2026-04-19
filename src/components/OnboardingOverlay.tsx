@@ -2,23 +2,25 @@ import type { IntroPhase } from '../types/scene'
 
 type OnboardingOverlayProps = {
   phase: IntroPhase
-  showHint: boolean
+  visibleHintIds: string[]
   onStart: () => void
   onSkip: () => void
-  onDismissHint: () => void
+  onDismissHint: (hintId: string) => void
 }
+
+const HINT_MESSAGES = [
+  { id: 'drag-explore', message: 'DRAG TO TILT / TAP A NODE TO EXPLORE' },
+  { id: 'zoom', message: 'SCROLL TO ZOOM IN / OUT' },
+]
 
 export function OnboardingOverlay({
   phase,
-  showHint,
+  visibleHintIds,
   onStart,
   onSkip,
   onDismissHint,
 }: OnboardingOverlayProps) {
-  const hintMessages = [
-    'DRAG TO TILT · TAP A NODE TO EXPLORE',
-    'SCROLL TO ZOOM IN · OUT',
-  ]
+  const visibleHints = HINT_MESSAGES.filter((hint) => visibleHintIds.includes(hint.id))
 
   return (
     <>
@@ -45,18 +47,18 @@ export function OnboardingOverlay({
         </button>
       )}
 
-      {showHint && phase === 'complete' && (
+      {visibleHints.length > 0 && phase === 'complete' && (
         <div className="onboarding-hints" aria-label="Interaction hints">
-          {hintMessages.map((message) => (
+          {visibleHints.map((hint) => (
             <button
-              key={message}
+              key={hint.id}
               type="button"
               className="onboarding-hint"
-              onClick={onDismissHint}
+              onClick={() => onDismissHint(hint.id)}
               aria-label="Dismiss hint"
             >
               <span className="hint-pulse" />
-              {message}
+              {hint.message}
               <span className="hint-pulse" />
             </button>
           ))}
