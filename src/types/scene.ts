@@ -15,6 +15,8 @@ export type ChildNodeData = {
   parentId: string
   position: THREE.Vector3
   radius: number
+  slotIndex: number
+  siblingCount: number
 }
 
 export type ClickableNode = {

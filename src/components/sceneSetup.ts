@@ -28,7 +28,11 @@ export function createSceneRuntime({
     0.1,
     260,
   )
-  const defaultCameraPosition = new THREE.Vector3(0, 8.4, viewportPreset.cameraDistance)
+  const defaultCameraPosition = new THREE.Vector3(
+    0,
+    viewportPreset.cameraHeight,
+    viewportPreset.cameraDistance,
+  )
   const cameraTarget = defaultCameraPosition.clone()
   const currentLookAt = new THREE.Vector3(0, 0, 0)
   const lookTarget = new THREE.Vector3(0, 0, 0)

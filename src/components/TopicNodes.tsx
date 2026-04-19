@@ -3,8 +3,35 @@ import { createOnboardingMotionState, resolveOnboardingPosition, smoothstep } fr
 import type { ChildNodeData, ClickableNode, TopicNodeData } from '../types/scene'
 
 const SELECTED_GLOW_COLOR = '#ffb700'
-const CHILD_ORBIT_SPEED_RANGE = { min: 0.22, max: 0.58 }
+const CHILD_ORBIT_SPEED_RANGE = { min: 0.12, max: 0.34 }
 const CHILD_RADIUS_SCALE = { min: 0.06, max: 0.22 }
+const TOPIC_LABEL_SCALE_RANGE = { min: 0.92, max: 1.7 }
+const BASE_ORBIT_SPEED = 0.055
+const MAX_VISIBLE_CHILDREN = 5
+const CHILD_PAGE_DURATION = 5
+
+const CATEGORY_HUES: Record<string, number> = {
+  Politics: 2,
+  Sports: 10,
+  Economy: 48,
+  Tech: 210,
+  Security: 34,
+  Daily: 190,
+  Entertainment: 330,
+  Career: 165,
+  Industry: 270,
+  Travel: 28,
+  Content: 295,
+  Housing: 80,
+  Air: 200,
+  Social: 24,
+  Food: 30,
+  Wellness: 105,
+  Fashion: 318,
+  Beauty: 336,
+  Shopping: 58,
+  Mobility: 198,
+}
 
 type NodeVisual = {
   id: string
@@ -14,6 +41,7 @@ type NodeVisual = {
   trail: THREE.Line
   trailGeometry: THREE.BufferGeometry
   label: THREE.Sprite
+  labelBaseScale: THREE.Vector3
   baseGlowColor: THREE.Color
   glowBaseScale: number
   score: number
@@ -46,6 +74,8 @@ type ChildVisual = {
   angularSpeed: number
   pulsePhase: number
   introOffset: number
+  slotIndex: number
+  siblingCount: number
 }
 
 function randomBetween(min: number, max: number) {
@@ -54,6 +84,14 @@ function randomBetween(min: number, max: number) {
 
 function trafficToGlowOpacity(score: number) {
   return 0.25 + Math.pow(Math.max(0, Math.min(100, score)) / 100, 1.2) * 0.70
+}
+
+function radiusToLabelScale(radius: number) {
+  const minRadius = 1.35
+  const maxRadius = 4.6
+  const normalized = Math.max(0, Math.min(1, (radius - minRadius) / (maxRadius - minRadius)))
+  return TOPIC_LABEL_SCALE_RANGE.min
+    + normalized * (TOPIC_LABEL_SCALE_RANGE.max - TOPIC_LABEL_SCALE_RANGE.min)
 }
 
 function computePulse(
@@ -169,10 +207,20 @@ export function buildChildNodes(nodes: TopicNodeData[]) {
         parentId: node.id,
         position,
         radius: randomBetween(CHILD_RADIUS_SCALE.min, CHILD_RADIUS_SCALE.max) * node.radius,
+        slotIndex: index,
+        siblingCount: related.length,
       })
     })
   })
   return children
+}
+
+function isChildInVisiblePage(slotIndex: number, siblingCount: number, elapsed: number) {
+  if (siblingCount <= MAX_VISIBLE_CHILDREN) return true
+  const pageCount = Math.ceil(siblingCount / MAX_VISIBLE_CHILDREN)
+  const pageIndex = Math.floor(elapsed / CHILD_PAGE_DURATION) % pageCount
+  const start = pageIndex * MAX_VISIBLE_CHILDREN
+  return slotIndex >= start && slotIndex < start + MAX_VISIBLE_CHILDREN
 }
 
 export function createTopicNodes(params: {
@@ -188,8 +236,8 @@ export function createTopicNodes(params: {
   const clickables: ClickableNode[] = []
   const nodeVisuals = new Map<string, NodeVisual>()
   const childVisuals: ChildVisual[] = []
+  const nodeHueMap = new Map<string, number>()
   const origin = new THREE.Vector3(0, 0, 0)
-  const PASTEL_HUES = [340, 25, 55, 145, 185, 215, 265, 300, 15, 90, 165, 235]
   const childLineMaterial = new THREE.LineDashedMaterial({
     color: '#0096c7',
     transparent: true,
@@ -200,27 +248,32 @@ export function createTopicNodes(params: {
     depthWrite: false,
   })
 
-  nodes.forEach((node, nodeIndex) => {
-    const pastelHue = PASTEL_HUES[nodeIndex % PASTEL_HUES.length]
+  nodes.forEach((node) => {
+    const pastelHue = CATEGORY_HUES[node.category] ?? 185
+    nodeHueMap.set(node.id, pastelHue)
     const satFactor = 0.2 + node.normScore * 0.7
-    const litBase = 0.08 + (node.normScore - 0.2) * 0.10
-    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.70 * satFactor, litBase)
-    const emissiveColor = new THREE.Color().setHSL(pastelHue / 360, 0.80 * satFactor, 0.40 + (node.normScore - 0.5) * 0.08)
+    const litBase = 0.12 + node.normScore * 0.12
+    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.72 * satFactor, litBase)
+    const emissiveColor = new THREE.Color().setHSL(pastelHue / 360, 0.90 * satFactor, 0.50 + node.normScore * 0.10)
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(node.radius, 48, 48),
       new THREE.MeshPhysicalMaterial({
         color: nodeColor,
         emissive: emissiveColor,
-        emissiveIntensity: 0.55,
+        emissiveIntensity: 0.85,
         transparent: false,
-        roughness: 0.12,
-        metalness: 0.05,
+        roughness: 0.10,
+        metalness: 0.08,
         clearcoat: 1,
-        clearcoatRoughness: 0.08,
+        clearcoatRoughness: 0.06,
+        iridescence: 1.0,
+        iridescenceIOR: 1.8,
       }),
     )
     const label = makeLabelSprite(node.label, mainLabelFont, true)
-    const glow = makeGlowSprite(new THREE.Color().setHSL(pastelHue / 360, 0.70 * satFactor, 0.72 + (node.normScore - 0.5) * 0.10), node.radius)
+    const labelBaseScale = label.scale.clone().multiplyScalar(radiusToLabelScale(node.radius))
+    label.scale.copy(labelBaseScale)
+    const glow = makeGlowSprite(new THREE.Color().setHSL(pastelHue / 360, 0.85 * satFactor, 0.80 + node.normScore * 0.08), node.radius)
     const glowMat = glow.material as THREE.SpriteMaterial
     const trailGeometry = new THREE.BufferGeometry().setFromPoints([origin, origin])
     const trail = new THREE.Line(
@@ -243,7 +296,6 @@ export function createTopicNodes(params: {
     trail.visible = false
     sceneRoot.add(mesh, glow, label, trail)
 
-    const ORBIT_SPEEDS = [0.10, 0.07, 0.045]
     const fp = motion.finalPosition
     const orbitHorizRadius = Math.sqrt(fp.x * fp.x + fp.z * fp.z)
     const orbitBaseAngle = Math.atan2(fp.z, fp.x)
@@ -256,7 +308,8 @@ export function createTopicNodes(params: {
       trail,
       trailGeometry,
       label,
-      baseGlowColor: new THREE.Color().setHSL(pastelHue / 360, 0.70 * satFactor, 0.72 + (node.normScore - 0.5) * 0.10),
+      labelBaseScale,
+      baseGlowColor: new THREE.Color().setHSL(pastelHue / 360, 0.85 * satFactor, 0.80 + node.normScore * 0.08),
       glowBaseScale,
       score: node.trafficScore,
       momentum: momentumById.get(node.id) ?? 0,
@@ -271,7 +324,7 @@ export function createTopicNodes(params: {
       isSelectedColor: false,
       orbitBaseAngle,
       orbitHorizRadius,
-      orbitSpeed: ORBIT_SPEEDS[node.orbit ?? 1],
+      orbitSpeed: BASE_ORBIT_SPEED,
       orbitRing: node.orbit ?? 1,
     })
 
@@ -283,25 +336,28 @@ export function createTopicNodes(params: {
   })
 
   childNodes.forEach((child, childIndex) => {
-    const childHue = PASTEL_HUES[(childIndex + 3) % PASTEL_HUES.length]
     const parentNode = nodeMap.get(child.parentId)
     if (!parentNode) return
+    const parentHue = nodeHueMap.get(child.parentId) ?? 185
+    const childHue = ((parentHue + (childIndex % 3 - 1) * 18) + 360) % 360
     const childSatFactor = 0.2 + parentNode.normScore * 0.7
-    const childLitBase = 0.08 + (parentNode.normScore - 0.2) * 0.10
-    const childColor = new THREE.Color().setHSL(childHue / 360, 0.72 * childSatFactor, childLitBase)
-    const childEmissive = new THREE.Color().setHSL(childHue / 360, 0.80 * childSatFactor, 0.38 + (parentNode.normScore - 0.5) * 0.08)
+    const childLitBase = 0.12 + parentNode.normScore * 0.12
+    const childColor = new THREE.Color().setHSL(childHue / 360, 0.74 * childSatFactor, childLitBase)
+    const childEmissive = new THREE.Color().setHSL(childHue / 360, 0.90 * childSatFactor, 0.48 + parentNode.normScore * 0.10)
 
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(child.radius, 24, 24),
       new THREE.MeshPhysicalMaterial({
         color: childColor,
         emissive: childEmissive,
-        emissiveIntensity: 0.50,
+        emissiveIntensity: 0.75,
         transparent: false,
-        roughness: 0.12,
-        metalness: 0.05,
+        roughness: 0.10,
+        metalness: 0.08,
         clearcoat: 0.9,
-        clearcoatRoughness: 0.08,
+        clearcoatRoughness: 0.06,
+        iridescence: 0.8,
+        iridescenceIOR: 1.6,
       }),
     )
     const label = makeLabelSprite(child.label, childLabelFont, false)
@@ -334,6 +390,8 @@ export function createTopicNodes(params: {
       angularSpeed: randomBetween(CHILD_ORBIT_SPEED_RANGE.min, CHILD_ORBIT_SPEED_RANGE.max),
       pulsePhase: Math.random() * Math.PI * 2,
       introOffset: randomBetween(0.08, 0.22),
+      slotIndex: child.slotIndex,
+      siblingCount: child.siblingCount,
     })
 
     clickables.push({
@@ -386,6 +444,7 @@ export function updateNodesForIntro(
 
     visual.mesh.position.copy(nextPosition)
     visual.glow.position.copy(nextPosition)
+    visual.label.scale.copy(visual.labelBaseScale)
     visual.label.position.set(nextPosition.x, nextPosition.y + visual.radius + 1.15, nextPosition.z)
     visual.trailGeometry.setFromPoints([visual.previousPosition.clone(), nextPosition.clone()])
     ;(visual.trail.material as THREE.LineBasicMaterial).opacity = Math.max(
@@ -402,14 +461,15 @@ export function updateNodesForIntro(
   childVisuals.forEach((child) => {
     const parentVisual = nodeVisuals.get(child.parentId)
     if (!parentVisual) return
+    const isVisibleInPage = child.slotIndex < MAX_VISIBLE_CHILDREN
     const childStart = 0.84 + child.introOffset
     const childT = smoothstep(childStart, 1, progress)
     const orbitPosition = parentVisual.mesh.position
       .clone()
       .add(child.finalOffset.clone().multiplyScalar(childT))
-    child.mesh.visible = childT > 0.02
-    child.label.visible = childT > 0.5
-    child.line.visible = childT > 0.16
+    child.mesh.visible = isVisibleInPage && childT > 0.02
+    child.label.visible = isVisibleInPage && childT > 0.5
+    child.line.visible = isVisibleInPage && childT > 0.16
     child.mesh.position.copy(orbitPosition)
     child.label.position.set(orbitPosition.x, orbitPosition.y + child.radius + 0.42, orbitPosition.z)
     child.line.geometry.setFromPoints([parentVisual.mesh.position, child.mesh.position])
@@ -450,6 +510,7 @@ export function updateNodesForFinalState(params: {
     visual.trail.visible = false
     visual.mesh.position.copy(_tmpVec)
     visual.mesh.scale.setScalar(breathe)
+    visual.label.scale.copy(visual.labelBaseScale).multiplyScalar(breathe)
     visual.label.position.set(ox, oy + visual.radius + 1.15, oz)
     visual.glow.position.copy(_tmpVec)
 
@@ -483,6 +544,7 @@ export function updateNodesForFinalState(params: {
   childVisuals.forEach((child) => {
     const parentVisual = nodeVisuals.get(child.parentId)
     if (!parentVisual) return
+    const isVisibleInPage = isChildInVisiblePage(child.slotIndex, child.siblingCount, elapsed)
     const orbitAngle = elapsed * child.angularSpeed + child.phaseOffset
     const orbitPosition = parentVisual.mesh.position
       .clone()
@@ -490,9 +552,9 @@ export function updateNodesForFinalState(params: {
       .addScaledVector(child.orbitTangent, Math.sin(orbitAngle))
     const pulse = 1 + Math.sin(elapsed * 1.4 + child.pulsePhase) * 0.06
 
-    child.mesh.visible = true
-    child.label.visible = true
-    child.line.visible = true
+    child.mesh.visible = isVisibleInPage
+    child.label.visible = isVisibleInPage
+    child.line.visible = isVisibleInPage
     child.mesh.position.copy(orbitPosition)
     child.mesh.scale.setScalar(pulse)
     child.label.position.set(

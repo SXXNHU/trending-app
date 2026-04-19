@@ -16,6 +16,7 @@ type StartSceneAnimationParams = {
   introDuration: number
   viewportPreset: {
     cameraDistance: number
+    cameraHeight: number
     focusDistance: number
   }
   defaultCameraPosition: THREE.Vector3
@@ -86,7 +87,7 @@ export function startSceneAnimation({
       )
       cameraTarget.set(
         Math.sin(elapsed * 0.45) * (1 - progress) * 1.4,
-        8.6 + (1 - progress) * 1.2,
+        viewportPreset.cameraHeight + 0.2 + (1 - progress) * 1.2,
         cinematicZoom,
       )
       lookTarget.set(0, Math.sin(elapsed * 1.6) * (1 - progress) * 0.8, 0)
@@ -95,7 +96,7 @@ export function startSceneAnimation({
       sceneRoot.rotation.x = currentRotation.x
       sceneRoot.rotation.y = currentRotation.y
       updateNodesForIntro(progress, nodeScene.nodeVisuals, nodeScene.childVisuals)
-      setOrbitRingOpacity(rings, smoothstep(0.82, 1, progress) * 0.5)
+      setOrbitRingOpacity(rings, smoothstep(0.82, 1, progress) * 0.18)
       if (progress >= 1 && !introDone) {
         introDone = true
         setIntroDone(true)
@@ -126,7 +127,7 @@ export function startSceneAnimation({
         selectedId: selectedIdRef.current,
         hoveredId: hoveredIdRef.current,
       })
-      setOrbitRingOpacity(rings, 0.5)
+      setOrbitRingOpacity(rings, 0.18)
     }
 
     camera.position.lerp(cameraTarget, 0.065)

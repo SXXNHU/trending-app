@@ -50,6 +50,13 @@ export function bindSceneInteractions({
   let activePointerId: number | null = null
   let pointerDown = { x: 0, y: 0, moved: false }
   let introDone = false
+  const baseCameraDistance = viewportPreset.cameraDistance
+  const baseCameraHeight = viewportPreset.cameraHeight
+
+  function applyDefaultCameraPosition(distance: number) {
+    const zoomRatio = distance / baseCameraDistance
+    defaultCameraPosition.set(0, baseCameraHeight * zoomRatio, distance)
+  }
 
   function setIntroDone(nextValue: boolean) {
     introDone = nextValue
@@ -58,10 +65,10 @@ export function bindSceneInteractions({
   function setCameraFromZoom(nextZoom: number) {
     zoomDistance = clamp(
       nextZoom,
-      viewportPreset.isCompact ? 31 : 27,
+      viewportPreset.isCompact ? 9 : 6,
       viewportPreset.isCompact ? 50 : 44,
     )
-    defaultCameraPosition.set(0, 8.4, zoomDistance)
+    applyDefaultCameraPosition(zoomDistance)
     if (!selectedIdRef.current && introDone) cameraTarget.copy(defaultCameraPosition)
   }
 
@@ -176,7 +183,7 @@ export function bindSceneInteractions({
     camera.fov = nextPreset.cameraFov
     camera.updateProjectionMatrix()
     renderer.setSize(mount.clientWidth, mount.clientHeight)
-    defaultCameraPosition.set(0, 8.4, nextPreset.cameraDistance)
+    defaultCameraPosition.set(0, nextPreset.cameraHeight, nextPreset.cameraDistance)
     if (!selectedIdRef.current) cameraTarget.copy(defaultCameraPosition)
   }
 

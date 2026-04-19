@@ -5,7 +5,7 @@ import { computeSimilarity } from '../layout/similarityMatrix'
 import type { TopicNodeData } from '../types/scene'
 import { buildChildNodes } from './TopicNodes'
 
-const TOPIC_RADIUS_RANGE = { min: 1.35, max: 6.1 }
+const TOPIC_RADIUS_RANGE = { min: 1.05, max: 3.3 }
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
@@ -38,6 +38,7 @@ export function getViewportPreset(width: number) {
   return {
     isCompact,
     cameraDistance: isCompact ? 40 : 34,
+    cameraHeight: isCompact ? 24 : 21.8,
     cameraFov: isCompact ? 54 : 46,
     dragX: isCompact ? 0.0022 : 0.0028,
     dragY: isCompact ? 0.0013 : 0.0016,
