@@ -173,7 +173,12 @@ export function bindSceneInteractions({
         cameraTarget.copy(defaultCameraPosition)
         lookTarget.set(0, 0, 0)
       }
-      onSelectTopicRef.current(hit?.topic.id ?? null)
+      const topicId = hit?.topic.id ?? null
+      if (event.pointerType === 'touch' && topicId !== null) {
+        setTimeout(() => onSelectTopicRef.current(topicId), 600)
+      } else {
+        onSelectTopicRef.current(topicId)
+      }
     }
 
     isDragging = false
