@@ -48,6 +48,40 @@ function formatPublishedAt(value) {
   return date.toISOString()
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function scaleTrendMetrics(topics) {
+  if (!topics.length) {
+    return []
+  }
+
+  const sortedBySignal = [...topics].sort((left, right) => right.rawSignal - left.rawSignal)
+  const maxRawSignal = Math.max(...topics.map((topic) => topic.rawSignal), 0)
+  const logSignals = topics.map((topic) => Math.log1p(topic.rawSignal * 1000))
+  const minLogSignal = Math.min(...logSignals)
+  const maxLogSignal = Math.max(...logSignals)
+  const logRange = maxLogSignal - minLogSignal || 1
+  const topicCount = Math.max(sortedBySignal.length - 1, 1)
+
+  const scaledTopics = sortedBySignal.map((topic, index) => {
+    const rankRatio = sortedBySignal.length === 1 ? 1 : 1 - index / topicCount
+    const logSignal = Math.log1p(topic.rawSignal * 1000)
+    const signalRatio = clamp((logSignal - minLogSignal) / logRange, 0, 1)
+    const blendedRatio = clamp(rankRatio * 0.58 + signalRatio * 0.42, 0, 1)
+    const relativeBuzzRatio = maxRawSignal > 0 ? clamp(topic.rawSignal / maxRawSignal, 0, 1) : 0
+
+    return {
+      ...topic,
+      trafficScore: Math.round(28 + Math.pow(blendedRatio, 0.9) * 72),
+      buzz: Math.max(1400, Math.round(1400 + Math.pow(relativeBuzzRatio, 0.78) * 14600)),
+    }
+  })
+
+  return scaledTopics.map(({ rawSignal, ...topic }) => topic)
+}
+
 async function fetchBatch(topics, clientId, clientSecret) {
   const today = new Date()
   const startDate = new Date(today)
@@ -90,8 +124,9 @@ async function fetchBatch(topics, clientId, clientSecret) {
 
     return {
       ...topic,
-      trafficScore: Math.max(14, Math.round(normalized * 115)),
-      buzz: Math.round(normalized * 16000),
+      rawSignal: normalized,
+      trafficScore: 0,
+      buzz: 0,
       sourceLabel: 'NAVER DataLab',
       collectedAt: new Date().toISOString(),
     }
@@ -254,7 +289,7 @@ async function fetchNaverTrends() {
   const responses = await Promise.all(
     batches.map((batch) => fetchBatch(batch, clientId, clientSecret)),
   )
-  const rankedTopics = responses.flat().sort((left, right) => right.trafficScore - left.trafficScore)
+  const rankedTopics = scaleTrendMetrics(responses.flat())
 
   return Promise.all(
     rankedTopics.map(async (topic) => {
