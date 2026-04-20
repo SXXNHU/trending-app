@@ -91,7 +91,7 @@ async function fetchBatch(topics, clientId, clientSecret) {
     return {
       ...topic,
       trafficScore: Math.max(14, Math.round(normalized * 115)),
-      buzz: Math.max(1400, Math.round(normalized * 16000)),
+      buzz: Math.round(normalized * 16000),
       sourceLabel: 'NAVER DataLab',
       collectedAt: new Date().toISOString(),
     }
