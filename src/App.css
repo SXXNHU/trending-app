@@ -338,6 +338,7 @@ button { font: inherit; cursor: pointer; }
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 /* ─── Onboarding hint ───────────────────────────────────── */
@@ -680,7 +681,64 @@ button { font: inherit; cursor: pointer; }
 /* ─── Responsive – compact (≤ 640 px) ──────────────────── */
 
 @media (max-width: 640px) {
-  .trend-sidebar { display: none; }
+  .trend-sidebar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 52px;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 4%,
+      black 96%,
+      transparent 100%
+    );
+  }
+
+  .trend-sidebar-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+  }
+
+  .trend-sidebar-track {
+    flex-direction: row;
+    height: 52px;
+  }
+
+  .trend-sidebar-item {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0 14px;
+    height: 52px;
+    border-left: none;
+    border-bottom: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.03);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .trend-sidebar-item.is-child { display: none; }
+
+  .trend-bar { display: none; }
+
+  .trend-rank {
+    font-size: 0.52rem;
+    opacity: 0.55;
+    width: auto;
+    text-align: left;
+  }
+
+  .trend-label {
+    font-size: 0.7rem;
+    max-width: 120px;
+  }
+
   .space-hud {
     inset: 14px 12px auto;
     gap: 8px;
