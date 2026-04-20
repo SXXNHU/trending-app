@@ -120,7 +120,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'k-pop',
-    label: 'K-팝',
+    label: 'K-POP',
     keywords: ['신곡 차트', '아이돌 컴백', '콘서트 일정', 'OST 인기곡'],
     category: 'Entertainment',
     summary: '컴백과 공연, 음원 차트가 맞물려 팬덤과 대중 검색이 함께 붙는 영역이에요.',
@@ -154,7 +154,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'influencer-youtube',
-    label: '인플루언서유튜브',
+    label: '인플루언서/유튜브',
     keywords: ['유튜버 수익', '인기 유튜버', '브이로그', '쇼츠 제작법'],
     category: 'Social',
     summary: '유튜브와 쇼츠 제작법, 인기 크리에이터 분석 수요가 꾸준히 강한 크리에이터 축이에요.',
@@ -171,7 +171,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'food-recipe',
-    label: '음식레시피',
+    label: '음식/레시피',
     keywords: ['소금빵 레시피', '쫀득쿠키', '연어 깍두기', '집밥 메뉴'],
     category: 'Food',
     summary: '바로 따라 할 수 있는 홈레시피와 바이럴 메뉴가 묶여 생활형 검색이 강한 주제예요.',
@@ -188,7 +188,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'cafe-dessert',
-    label: '카페디저트',
+    label: '카페/디저트',
     keywords: ['두바이 초콜릿', '크보빵', '핫플 카페', '신상 메뉴'],
     category: 'Food',
     summary: '바이럴 디저트와 핫플 카페가 결합되면 인증 수요까지 붙어 화제가 길게 갑니다.',
@@ -205,7 +205,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'delivery-food',
-    label: '배달맛집',
+    label: '배달/맛집',
     keywords: ['배달 추천', '혼밥 맛집', '지역 맛집', '야식 추천'],
     category: 'Food',
     summary: '즉시 주문 의도가 강해서 검색이 실구매로 이어지기 쉬운 생활형 주제예요.',
@@ -222,7 +222,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'health-diet',
-    label: '건강다이어트',
+    label: '건강/다이어트',
     keywords: ['간헐적 단식', '단백질 식단', '다이어트 운동', '건강검진'],
     category: 'Wellness',
     summary: '체중 관리와 건강검진, 식단 루틴이 함께 움직이며 시즌성 반응이 큰 주제예요.',
@@ -256,7 +256,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'running-fitness',
-    label: '운동러닝',
+    label: '스포츠/운동',
     keywords: ['러닝화 추천', '마라톤 일정', '디즈니런', '헬스 루틴'],
     category: 'Sports',
     summary: '러닝 붐과 운동 루틴 수요가 겹치며 장비와 일정 검색까지 연결되는 성장형 주제예요.',
@@ -307,7 +307,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'shopping',
-    label: '쇼핑핫템',
+    label: '쇼핑',
     keywords: ['바이럴 제품', '가성비 제품', '신상템', '할인 정보'],
     category: 'Shopping',
     summary: '바이럴 상품과 할인 정보는 구매 전환 의도가 강해서 검색과 소비가 동시에 움직이는 분야예요.',
