@@ -3,6 +3,7 @@
 
 :root {
   color-scheme: dark;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
   --line: rgba(0, 200, 255, 0.14);
   --line-soft: rgba(0, 180, 230, 0.1);
   --text: #d4edf8;
@@ -27,7 +28,7 @@ body,
 
 body {
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
   font-family:
     'Mona12',
     'HSJiphyeongseon',
@@ -233,7 +234,7 @@ button { font: inherit; cursor: pointer; }
   right: 0;
   width: 180px;
   height: 100vh;
-  z-index: 3;
+  z-index: 8;
   pointer-events: none;
   mask-image: linear-gradient(
     to bottom,
@@ -694,7 +695,8 @@ button { font: inherit; cursor: pointer; }
     left: 0;
     right: 0;
     width: 100%;
-    height: 52px;
+    height: calc(52px + var(--safe-bottom));
+    padding-bottom: var(--safe-bottom);
     mask-image: linear-gradient(
       to right,
       transparent 0%,
@@ -775,12 +777,12 @@ button { font: inherit; cursor: pointer; }
   }
 
   .topic-modal {
-    inset: 12px 10px 10px;
+    inset: 12px 10px calc(10px + var(--safe-bottom));
     width: calc(100vw - 20px);
     max-width: calc(100vw - 20px);
     padding: 10px 16px 16px;
     border-radius: 5px;
-    max-height: calc(100dvh - 22px);
+    max-height: calc(100dvh - 22px - var(--safe-bottom));
   }
 
   .topic-modal h2 {
@@ -898,6 +900,10 @@ button { font: inherit; cursor: pointer; }
 }
 
 @media (max-width: 640px) {
+  .intro-overlay {
+    inset: 0 0 calc(52px + var(--safe-bottom)) 0;
+  }
+
   .intro-skip {
     top: 14px;
     right: 12px;

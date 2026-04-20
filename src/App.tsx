@@ -239,33 +239,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!window.matchMedia('(pointer: coarse)').matches) return
-    if (onboarding.phase === 'complete') return
-
-    const html = document.documentElement
-    const { body } = document
-    const previous = {
-      htmlOverflow: html.style.overflow,
-      htmlOverscrollBehavior: html.style.overscrollBehavior,
-      bodyOverflow: body.style.overflow,
-      bodyOverscrollBehavior: body.style.overscrollBehavior,
-    }
-
-    html.style.overflow = 'hidden'
-    html.style.overscrollBehavior = 'none'
-    body.style.overflow = 'hidden'
-    body.style.overscrollBehavior = 'none'
-
-    return () => {
-      html.style.overflow = previous.htmlOverflow
-      html.style.overscrollBehavior = previous.htmlOverscrollBehavior
-      body.style.overflow = previous.bodyOverflow
-      body.style.overscrollBehavior = previous.bodyOverscrollBehavior
-    }
-  }, [onboarding.phase])
-
   const handleSidebarClick = useCallback((parentId: string) => {
     focusSeqRef.current += 1
     setFocusRequest({ id: parentId, seq: focusSeqRef.current })
