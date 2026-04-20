@@ -251,9 +251,16 @@ button { font: inherit; cursor: pointer; }
   overflow-x: hidden;
   pointer-events: auto;
   scrollbar-width: none;
+  overscroll-behavior: contain;
+  touch-action: none;
+  cursor: grab;
 }
 
 .trend-sidebar-scroll::-webkit-scrollbar { display: none; }
+
+.trend-sidebar-scroll.is-dragging {
+  cursor: grabbing;
+}
 
 .trend-sidebar-track {
   display: flex;
@@ -701,6 +708,7 @@ button { font: inherit; cursor: pointer; }
     overflow-x: auto;
     overflow-y: hidden;
     touch-action: pan-x;
+    cursor: auto;
   }
 
   .trend-sidebar-track {

@@ -138,6 +138,10 @@ function App() {
           if (half > 0 && pos >= half) pos -= half
           container.scrollTop = pos
         }
+      } else if (isMobile()) {
+        pos = container.scrollLeft
+      } else {
+        pos = container.scrollTop
       }
       frameId = requestAnimationFrame(tick)
     }
@@ -152,6 +156,88 @@ function App() {
       container.removeEventListener('touchend', onTouchEnd)
     }
   }, [sidebarItems])
+
+  useEffect(() => {
+    const scrollContainer = sidebarScrollRef.current
+    if (!scrollContainer) return
+    const container = scrollContainer
+
+    const isMobile = () => window.matchMedia('(max-width: 640px)').matches
+
+    let activePointerId: number | null = null
+    let startAxisPosition = 0
+    let startScrollOffset = 0
+    let moved = false
+    let suppressClickUntil = 0
+
+    const getAxisPosition = (event: PointerEvent) => (isMobile() ? event.clientX : event.clientY)
+    const getScrollOffset = () => (isMobile() ? container.scrollLeft : container.scrollTop)
+    const setScrollOffset = (value: number) => {
+      if (isMobile()) {
+        container.scrollLeft = value
+      } else {
+        container.scrollTop = value
+      }
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+
+      activePointerId = event.pointerId
+      startAxisPosition = getAxisPosition(event)
+      startScrollOffset = getScrollOffset()
+      moved = false
+
+      container.classList.add('is-dragging')
+      container.setPointerCapture(event.pointerId)
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== activePointerId) return
+
+      const delta = getAxisPosition(event) - startAxisPosition
+      if (Math.abs(delta) > 6) moved = true
+
+      if (moved) {
+        event.preventDefault()
+        setScrollOffset(startScrollOffset - delta)
+      }
+    }
+
+    const endDrag = (event: PointerEvent) => {
+      if (event.pointerId !== activePointerId) return
+
+      if (moved) suppressClickUntil = performance.now() + 250
+
+      container.classList.remove('is-dragging')
+      if (container.hasPointerCapture(event.pointerId)) {
+        container.releasePointerCapture(event.pointerId)
+      }
+      activePointerId = null
+      moved = false
+    }
+
+    const onClickCapture = (event: MouseEvent) => {
+      if (performance.now() > suppressClickUntil) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    container.addEventListener('pointerdown', onPointerDown)
+    container.addEventListener('pointermove', onPointerMove)
+    container.addEventListener('pointerup', endDrag)
+    container.addEventListener('pointercancel', endDrag)
+    container.addEventListener('click', onClickCapture, true)
+
+    return () => {
+      container.classList.remove('is-dragging')
+      container.removeEventListener('pointerdown', onPointerDown)
+      container.removeEventListener('pointermove', onPointerMove)
+      container.removeEventListener('pointerup', endDrag)
+      container.removeEventListener('pointercancel', endDrag)
+      container.removeEventListener('click', onClickCapture, true)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
