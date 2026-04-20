@@ -133,6 +133,7 @@ export function startSceneAnimation({
         pendingLabelBatches: nodeScene.pendingLabelBatches,
         selectedId: selectedIdRef.current,
         hoveredId: hoveredIdRef.current,
+        mainLabelFont: nodeScene.mainLabelFont,
         childLabelFont: nodeScene.childLabelFont,
       })
       setOrbitRingOpacity(rings, 0.18)

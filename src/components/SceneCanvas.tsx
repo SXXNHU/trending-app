@@ -164,10 +164,10 @@ export function SceneCanvas({
 
     const { nodes } = buildSceneModel(topics, previousSnapshotRef.current)
     scheduleChildLabelUpdates(
+      runtime.nodeScene.nodeVisuals,
       runtime.nodeScene.childVisuals,
       runtime.nodeScene.pendingLabelBatches,
       nodes,
-      childLabelFontRef.current,
     )
     previousSnapshotRef.current = new Map(topics.map((topic) => [topic.id, topic.trafficScore]))
   }, [topics])

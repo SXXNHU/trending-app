@@ -41,6 +41,12 @@ type NodeVisual = {
   trailGeometry: THREE.BufferGeometry
   label: THREE.Sprite
   labelBaseScale: THREE.Vector3
+  currentLabel: string
+  labelFade: null | {
+    phase: 'out' | 'in'
+    t: number
+    pendingText: string
+  }
   baseGlowColor: THREE.Color
   glowBaseScale: number
   score: number
@@ -85,7 +91,10 @@ type ChildVisual = {
 }
 
 type PendingLabelBatch = {
-  items: Array<{ visual: ChildVisual; newText: string }>
+  items: Array<
+    | { kind: 'child'; visual: ChildVisual; newText: string }
+    | { kind: 'node'; visual: NodeVisual; newText: string }
+  >
   delay: number
 }
 
@@ -177,6 +186,17 @@ function makeLabelSprite(text: string, fontSize: number, isMain = false) {
 
 function swapChildLabelSprite(label: THREE.Sprite, nextText: string, fontSize: number) {
   const nextSprite = makeLabelSprite(nextText, fontSize, false)
+  const oldMaterial = label.material as THREE.SpriteMaterial
+  const nextMaterial = nextSprite.material as THREE.SpriteMaterial
+  nextMaterial.opacity = 0
+  oldMaterial.map?.dispose()
+  oldMaterial.dispose()
+  label.material = nextMaterial
+  label.scale.copy(nextSprite.scale)
+}
+
+function swapMainLabelSprite(label: THREE.Sprite, nextText: string, fontSize: number) {
+  const nextSprite = makeLabelSprite(nextText, fontSize, true)
   const oldMaterial = label.material as THREE.SpriteMaterial
   const nextMaterial = nextSprite.material as THREE.SpriteMaterial
   nextMaterial.opacity = 0
@@ -349,6 +369,8 @@ export function createTopicNodes(params: {
       trailGeometry,
       label,
       labelBaseScale,
+      currentLabel: node.label,
+      labelFade: null,
       baseGlowColor: new THREE.Color().setHSL(
         pastelHue / 360,
         0.9 * satFactor,
@@ -454,22 +476,33 @@ export function createTopicNodes(params: {
     clickables,
     childLineMaterial,
     pendingLabelBatches,
+    mainLabelFont,
     childLabelFont,
   }
 }
 
 export function scheduleChildLabelUpdates(
+  nodeVisuals: Map<string, NodeVisual>,
   childVisuals: ChildVisual[],
   pendingBatches: PendingLabelBatch[],
   newNodes: TopicNodeData[],
-  _childLabelFont: number,
 ) {
   const relatedTopicsByParent = new Map(
     newNodes.map((node) => [node.id, node.relatedTopics ?? []] as const),
   )
   const grouped = new Map<string, Array<{ visual: ChildVisual; newText: string }>>()
+  const nodeLabelUpdates: Array<{ visual: NodeVisual; newText: string }> = []
 
   pendingBatches.length = 0
+
+  newNodes.forEach((node) => {
+    const visual = nodeVisuals.get(node.id)
+    if (!visual) return
+
+    const currentTarget = visual.labelFade?.pendingText ?? visual.currentLabel
+    if (currentTarget === node.label) return
+    nodeLabelUpdates.push({ visual, newText: node.label })
+  })
 
   childVisuals.forEach((visual) => {
     const nextLabels = relatedTopicsByParent.get(visual.parentId)
@@ -487,10 +520,12 @@ export function scheduleChildLabelUpdates(
     grouped.set(visual.parentId, [item])
   })
 
-  if (grouped.size === 0) return
-
   const parentQueues = Array.from(grouped.values())
-  const interleaved: Array<{ visual: ChildVisual; newText: string }> = []
+  const interleaved: PendingLabelBatch['items'] = nodeLabelUpdates.map(({ visual, newText }) => ({
+    kind: 'node',
+    visual,
+    newText,
+  }))
   let consumed = true
 
   while (consumed) {
@@ -498,10 +533,16 @@ export function scheduleChildLabelUpdates(
     parentQueues.forEach((queue) => {
       const nextItem = queue.shift()
       if (!nextItem) return
-      interleaved.push(nextItem)
+      interleaved.push({
+        kind: 'child',
+        visual: nextItem.visual,
+        newText: nextItem.newText,
+      })
       consumed = true
     })
   }
+
+  if (interleaved.length === 0) return
 
   for (let index = 0; index < interleaved.length; index += 10) {
     pendingBatches.push({
@@ -596,6 +637,7 @@ export function updateNodesForFinalState(params: {
   pendingLabelBatches: PendingLabelBatch[]
   selectedId: string | null
   hoveredId: string | null
+  mainLabelFont: number
   childLabelFont: number
 }) {
   const {
@@ -606,6 +648,7 @@ export function updateNodesForFinalState(params: {
     pendingLabelBatches,
     selectedId,
     hoveredId,
+    mainLabelFont,
     childLabelFont,
   } = params
 
@@ -665,15 +708,48 @@ export function updateNodesForFinalState(params: {
     const batch = pendingLabelBatches[index]
     batch.delay -= dt
     if (batch.delay > 0) continue
-    batch.items.forEach(({ visual, newText }) => {
-      visual.labelFade = {
+    batch.items.forEach((item) => {
+      item.visual.labelFade = {
         phase: 'out',
         t: 0,
-        pendingText: newText,
+        pendingText: item.newText,
       }
     })
     pendingLabelBatches.splice(index, 1)
   }
+
+  nodeVisuals.forEach((visual) => {
+    const labelMaterial = visual.label.material as THREE.SpriteMaterial
+    if (!visual.labelFade) {
+      labelMaterial.opacity = 1
+      return
+    }
+
+    const fadeSpeed = dt / 0.35
+    visual.labelFade.t = Math.min(1, visual.labelFade.t + fadeSpeed)
+
+    if (visual.labelFade.phase === 'out') {
+      labelMaterial.opacity = 1 - visual.labelFade.t
+      if (visual.labelFade.t < 1) return
+
+      const pendingText = visual.labelFade.pendingText
+      swapMainLabelSprite(visual.label, pendingText, mainLabelFont)
+      visual.labelBaseScale = visual.label.scale.clone().multiplyScalar(radiusToLabelScale(visual.radius))
+      visual.labelFade = {
+        phase: 'in',
+        t: 0,
+        pendingText,
+      }
+      return
+    }
+
+    labelMaterial.opacity = visual.labelFade.t
+    if (visual.labelFade.t < 1) return
+
+    visual.currentLabel = visual.labelFade.pendingText
+    visual.labelFade = null
+    labelMaterial.opacity = 1
+  })
 
   childVisuals.forEach((child) => {
     const parentVisual = nodeVisuals.get(child.parentId)
