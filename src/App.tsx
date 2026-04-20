@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { OnboardingOverlay } from './components/OnboardingOverlay'
-import { SceneCanvas } from './components/SceneCanvas'
 import { TopicModal } from './components/TopicModal'
 import { useCameraControl } from './hooks/useCameraControl'
 import { useOnboarding } from './hooks/useOnboarding'
 import { useTrends } from './hooks/useTrends'
+
+const SceneCanvas = lazy(async () => {
+  const module = await import('./components/SceneCanvas')
+  return { default: module.SceneCanvas }
+})
 
 function formatBuzz(buzz: number) {
   return `${buzz.toLocaleString('en-US')} signals`
@@ -250,17 +254,19 @@ function App() {
       </aside>
 
       <section className="scene-viewport">
-        <SceneCanvas
-          topics={topics}
-          introPhase={onboarding.phase}
-          introDuration={onboarding.duration}
-          controlsEnabled={cameraControl.controlsEnabled}
-          onIntroComplete={onboarding.completeIntro}
-          onMarkInteraction={onboarding.markInteraction}
-          onSelectTopic={setModalTopicId}
-          focusRequest={focusRequest}
-          selectedTopicId={modalTopicId}
-        />
+        <Suspense fallback={<div className="scene-mount" aria-hidden="true" />}>
+          <SceneCanvas
+            topics={topics}
+            introPhase={onboarding.phase}
+            introDuration={onboarding.duration}
+            controlsEnabled={cameraControl.controlsEnabled}
+            onIntroComplete={onboarding.completeIntro}
+            onMarkInteraction={onboarding.markInteraction}
+            onSelectTopic={setModalTopicId}
+            focusRequest={focusRequest}
+            selectedTopicId={modalTopicId}
+          />
+        </Suspense>
       </section>
 
       <OnboardingOverlay
