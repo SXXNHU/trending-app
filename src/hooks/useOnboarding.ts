@@ -4,8 +4,8 @@ import type { IntroPhase } from '../types/scene'
 const INTRO_STORAGE_KEY = 'trending-app-intro-seen'
 const DEFAULT_HINT_IDS = ['drag-explore', 'zoom'] as const
 const INTRO_DURATION = {
-  full: 3.2,
-  short: 2.1,
+  full: 3.6,
+  short: 2.5,
 }
 
 function readHasSeenIntro() {
