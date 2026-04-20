@@ -8,7 +8,7 @@ import { bindSceneInteractions } from './sceneInteraction'
 import { buildSceneModel } from './sceneModel'
 import { disposeOrbitRings } from './OrbitRings'
 import { createSceneRuntime } from './sceneSetup'
-import { disposeTopicNodes } from './TopicNodes'
+import { disposeTopicNodes, scheduleChildLabelUpdates } from './TopicNodes'
 
 type SceneCanvasProps = {
   topics: TrendTopic[]
@@ -34,9 +34,27 @@ export function SceneCanvas({
   selectedTopicId,
 }: SceneCanvasProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
+  const topicsRef = useRef(topics)
   const previousSnapshotRef = useRef<Map<string, number>>(new Map())
   const focusRequestRef = useRef<{ id: string; seq: number } | null>(null)
   const interactionRef = useRef<ReturnType<typeof bindSceneInteractions> | null>(null)
+  const runtimeRef = useRef<ReturnType<typeof createSceneRuntime> | null>(null)
+  const childLabelFontRef = useRef(0)
+  const isFirstTopicsRef = useRef(true)
+  const introPhaseRef = useRef(introPhase)
+  const introDurationRef = useRef(introDuration)
+  const controlsEnabledRef = useRef(controlsEnabled)
+  const onIntroCompleteRef = useRef(onIntroComplete)
+  const onMarkInteractionRef = useRef(onMarkInteraction)
+  const onSelectTopicRef = useRef(onSelectTopic)
+
+  topicsRef.current = topics
+  introPhaseRef.current = introPhase
+  introDurationRef.current = introDuration
+  controlsEnabledRef.current = controlsEnabled
+  onIntroCompleteRef.current = onIntroComplete
+  onMarkInteractionRef.current = onMarkInteraction
+  onSelectTopicRef.current = onSelectTopic
 
   useEffect(() => {
     if (focusRequest) focusRequestRef.current = focusRequest
@@ -47,7 +65,7 @@ export function SceneCanvas({
     if (!mount) return
 
     const { nodes, childNodes, momentumById } = buildSceneModel(
-      topics,
+      topicsRef.current,
       previousSnapshotRef.current,
     )
     const runtime = createSceneRuntime({
@@ -56,6 +74,8 @@ export function SceneCanvas({
       childNodes,
       momentumById,
     })
+    runtimeRef.current = runtime
+    childLabelFontRef.current = runtime.viewportPreset.childLabelFont
     const selectedIdRef = { current: null as string | null }
     const hoveredIdRef = { current: null as string | null }
     const baseSceneRotation = new THREE.Euler(-0.18, 0.48, 0.02)
@@ -69,7 +89,7 @@ export function SceneCanvas({
       camera: runtime.camera,
       renderer: runtime.renderer,
       clickables: runtime.nodeScene.clickables,
-      controlsEnabled,
+      controlsEnabledRef,
       viewportPreset: runtime.viewportPreset,
       cameraTarget: runtime.cameraTarget,
       defaultCameraPosition: runtime.defaultCameraPosition,
@@ -77,8 +97,8 @@ export function SceneCanvas({
       rotationTarget,
       selectedIdRef,
       hoveredIdRef,
-      onMarkInteraction,
-      onSelectTopic,
+      onMarkInteractionRef,
+      onSelectTopicRef,
     })
     interactionRef.current = interaction
 
@@ -90,8 +110,8 @@ export function SceneCanvas({
       background: runtime.background,
       rings: runtime.rings,
       nodeScene: runtime.nodeScene,
-      introPhase,
-      introDuration,
+      introPhaseRef,
+      introDurationRef,
       viewportPreset: runtime.viewportPreset,
       defaultCameraPosition: runtime.defaultCameraPosition,
       cameraTarget: runtime.cameraTarget,
@@ -102,14 +122,19 @@ export function SceneCanvas({
       rotationTarget,
       currentRotation,
       baseSceneRotation,
-      onIntroComplete,
+      onIntroCompleteRef,
       setIntroDone: interaction.setIntroDone,
       focusRequestRef,
     })
 
     return () => {
       interactionRef.current = null
-      previousSnapshotRef.current = new Map(topics.map((topic) => [topic.id, topic.trafficScore]))
+      runtimeRef.current = null
+      childLabelFontRef.current = 0
+      isFirstTopicsRef.current = true
+      previousSnapshotRef.current = new Map(
+        topicsRef.current.map((topic) => [topic.id, topic.trafficScore]),
+      )
       runtime.renderer.setAnimationLoop(null)
       interaction.cleanup()
       runtime.renderer.dispose()
@@ -126,15 +151,26 @@ export function SceneCanvas({
       )
       mount.innerHTML = ''
     }
-  }, [
-    controlsEnabled,
-    introDuration,
-    introPhase,
-    onIntroComplete,
-    onMarkInteraction,
-    onSelectTopic,
-    topics,
-  ])
+  }, [])
+
+  useEffect(() => {
+    if (isFirstTopicsRef.current) {
+      isFirstTopicsRef.current = false
+      return
+    }
+
+    const runtime = runtimeRef.current
+    if (!runtime) return
+
+    const { nodes } = buildSceneModel(topics, previousSnapshotRef.current)
+    scheduleChildLabelUpdates(
+      runtime.nodeScene.childVisuals,
+      runtime.nodeScene.pendingLabelBatches,
+      nodes,
+      childLabelFontRef.current,
+    )
+    previousSnapshotRef.current = new Map(topics.map((topic) => [topic.id, topic.trafficScore]))
+  }, [topics])
 
   useEffect(() => {
     if (selectedTopicId === null) {
