@@ -97,6 +97,14 @@ function trafficToGlowOpacity(score: number) {
   return 0.25 + Math.pow(Math.max(0, Math.min(100, score)) / 100, 1.2) * 0.70
 }
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value))
+}
+
+function trafficToVisualWeight(score: number) {
+  return clamp01(score / 100)
+}
+
 function radiusToLabelScale(radius: number) {
   const minRadius = 1.35
   const maxRadius = 4.6
@@ -269,17 +277,24 @@ export function createTopicNodes(params: {
   nodes.forEach((node) => {
     const pastelHue = CATEGORY_HUES[node.category] ?? 185
     nodeHueMap.set(node.id, pastelHue)
-    const satFactor = 0.01 + Math.pow(node.normScore, 0.65) * 0.99
-    const litBase = 0.12 + node.normScore * 0.12
-    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.92 * satFactor, litBase)
-    const emissiveColor = new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.50 + node.normScore * 0.10)
+    const visualWeight = trafficToVisualWeight(node.trafficScore)
+    const satFactor = 0.14 + Math.pow(node.normScore, 0.65) * 0.54 + visualWeight * 0.32
+    const litBase = 0.08 + node.normScore * 0.07 + visualWeight * 0.1
+    const nodeOpacity = 0.3 + visualWeight * 0.7
+    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.78 * satFactor, litBase)
+    const emissiveColor = new THREE.Color().setHSL(
+      pastelHue / 360,
+      0.86 * satFactor,
+      0.26 + node.normScore * 0.05 + visualWeight * 0.16,
+    )
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(node.radius, 48, 48),
       new THREE.MeshPhysicalMaterial({
         color: nodeColor,
         emissive: emissiveColor,
-        emissiveIntensity: 0.85,
-        transparent: false,
+        emissiveIntensity: 0.4 + visualWeight * 0.45,
+        transparent: true,
+        opacity: nodeOpacity,
         roughness: 0.10,
         metalness: 0.08,
         clearcoat: 1,
@@ -291,7 +306,14 @@ export function createTopicNodes(params: {
     const label = makeLabelSprite(node.label, mainLabelFont, true)
     const labelBaseScale = label.scale.clone().multiplyScalar(radiusToLabelScale(node.radius))
     label.scale.copy(labelBaseScale)
-    const glow = makeGlowSprite(new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.80 + node.normScore * 0.08), node.radius)
+    const glow = makeGlowSprite(
+      new THREE.Color().setHSL(
+        pastelHue / 360,
+        0.9 * satFactor,
+        0.56 + node.normScore * 0.04 + visualWeight * 0.12,
+      ),
+      node.radius,
+    )
     const glowMat = glow.material as THREE.SpriteMaterial
     const trailGeometry = new THREE.BufferGeometry().setFromPoints([origin, origin])
     const trail = new THREE.Line(
@@ -327,7 +349,11 @@ export function createTopicNodes(params: {
       trailGeometry,
       label,
       labelBaseScale,
-      baseGlowColor: new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.80 + node.normScore * 0.08),
+      baseGlowColor: new THREE.Color().setHSL(
+        pastelHue / 360,
+        0.9 * satFactor,
+        0.56 + node.normScore * 0.04 + visualWeight * 0.12,
+      ),
       glowBaseScale,
       score: node.trafficScore,
       normScore: node.normScore,
