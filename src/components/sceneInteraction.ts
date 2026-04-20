@@ -11,7 +11,7 @@ type BindSceneInteractionsParams = {
   camera: THREE.PerspectiveCamera
   renderer: THREE.WebGLRenderer
   clickables: ClickableNode[]
-  controlsEnabled: boolean
+  controlsEnabledRef: { current: boolean }
   viewportPreset: ReturnType<typeof getViewportPreset>
   cameraTarget: THREE.Vector3
   defaultCameraPosition: THREE.Vector3
@@ -19,8 +19,8 @@ type BindSceneInteractionsParams = {
   rotationTarget: THREE.Vector2
   selectedIdRef: { current: string | null }
   hoveredIdRef: { current: string | null }
-  onMarkInteraction: () => void
-  onSelectTopic: (topicId: string | null) => void
+  onMarkInteractionRef: { current: () => void }
+  onSelectTopicRef: { current: (topicId: string | null) => void }
 }
 
 export function bindSceneInteractions({
@@ -28,7 +28,7 @@ export function bindSceneInteractions({
   camera,
   renderer,
   clickables,
-  controlsEnabled,
+  controlsEnabledRef,
   viewportPreset,
   cameraTarget,
   defaultCameraPosition,
@@ -36,8 +36,8 @@ export function bindSceneInteractions({
   rotationTarget,
   selectedIdRef,
   hoveredIdRef,
-  onMarkInteraction,
-  onSelectTopic,
+  onMarkInteractionRef,
+  onSelectTopicRef,
 }: BindSceneInteractionsParams) {
   const raycaster = new THREE.Raycaster()
   const pointer = new THREE.Vector2()
@@ -86,15 +86,17 @@ export function bindSceneInteractions({
   }
 
   function handleWheel(event: WheelEvent) {
-    if (!controlsEnabled) return
+    if (!controlsEnabledRef.current) return
     event.preventDefault()
     setCameraFromZoom(zoomDistance + (event.deltaY > 0 ? 1 : -1) * 2.2)
   }
 
   function handlePointerDown(event: PointerEvent) {
-    if (!controlsEnabled) return
+    if (!controlsEnabledRef.current) return
+    if (event.pointerType === 'touch') event.preventDefault()
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
     hoveredIdRef.current = null
+    renderer.domElement.setPointerCapture?.(event.pointerId)
 
     if (activePointers.size === 2) {
       isDragging = false
@@ -110,7 +112,8 @@ export function bindSceneInteractions({
   }
 
   function handlePointerMove(event: PointerEvent) {
-    if (!controlsEnabled) return
+    if (!controlsEnabledRef.current) return
+    if (event.pointerType === 'touch') event.preventDefault()
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
     if (isPinching && activePointers.size >= 2) {
@@ -129,11 +132,11 @@ export function bindSceneInteractions({
     rotationTarget.y += deltaX * viewportPreset.dragX
     rotationTarget.x = clamp(rotationTarget.x + deltaY * viewportPreset.dragY, -0.54, 0.12)
     pointerDown = { x: event.clientX, y: event.clientY, moved: pointerDown.moved }
-    onMarkInteraction()
+    onMarkInteractionRef.current()
   }
 
-  function handlePointerUp(event: PointerEvent) {
-    if (!controlsEnabled) return
+  function finishPointer(event: PointerEvent, allowTap = true) {
+    renderer.domElement.releasePointerCapture?.(event.pointerId)
     activePointers.delete(event.pointerId)
     if (isPinching) {
       if (activePointers.size < 2) {
@@ -145,7 +148,7 @@ export function bindSceneInteractions({
     }
     if (activePointerId === null || activePointerId !== event.pointerId) return
 
-    if (!pointerDown.moved) {
+    if (allowTap && !pointerDown.moved) {
       updatePointer(event)
       raycaster.setFromCamera(pointer, camera)
       const intersects = raycaster.intersectObjects(
@@ -170,11 +173,22 @@ export function bindSceneInteractions({
         cameraTarget.copy(defaultCameraPosition)
         lookTarget.set(0, 0, 0)
       }
-      onSelectTopic(hit?.topic.id ?? null)
+      onSelectTopicRef.current(hit?.topic.id ?? null)
     }
 
     isDragging = false
     activePointerId = null
+  }
+
+  function handlePointerUp(event: PointerEvent) {
+    if (!controlsEnabledRef.current) return
+    if (event.pointerType === 'touch') event.preventDefault()
+    finishPointer(event)
+  }
+
+  function handlePointerCancel(event: PointerEvent) {
+    if (!controlsEnabledRef.current) return
+    finishPointer(event, false)
   }
 
   function handleResize() {
@@ -191,6 +205,7 @@ export function bindSceneInteractions({
   renderer.domElement.addEventListener('pointermove', handlePointerMove)
   renderer.domElement.addEventListener('wheel', handleWheel, { passive: false })
   window.addEventListener('pointerup', handlePointerUp)
+  window.addEventListener('pointercancel', handlePointerCancel)
   window.addEventListener('resize', handleResize)
 
   return {
@@ -205,6 +220,7 @@ export function bindSceneInteractions({
       renderer.domElement.removeEventListener('pointermove', handlePointerMove)
       renderer.domElement.removeEventListener('wheel', handleWheel)
       window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
       window.removeEventListener('resize', handleResize)
     },
   }
