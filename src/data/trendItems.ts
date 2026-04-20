@@ -46,7 +46,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   },
   {
     id: 'fitness',
-    label: '운동',
+    label: '건강/운동',
     keywords: ['운동', '마라톤', '골프', '당구', '로드 fc'],
     category: 'Fitness',
     summary: '러닝, 골프, 당구, 격투 스포츠처럼 직접 참여형 운동 키워드가 시즌성과 함께 꾸준히 강한 반응을 만든다.',
@@ -81,7 +81,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
   {
     id: 'entertainment-broadcast',
     label: '연예 / 방송',
-    keywords: ['전현무', '박나래', '김수현', '임영웅', '나는 solo'],
+    keywords: ['전현무', '양치승', '김수현', '임영웅', '박명수'],
     category: 'Entertainment',
     summary: '예능, 드라마, 트로트, 스타 이슈가 방송 편성 시간대와 맞물리며 검색 파급력이 크게 확장되는 주제다.',
     issueReason: [
@@ -93,12 +93,12 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
     orbit: 0,
     angle: 1.36,
     links: ['ott', 'beauty', 'sns-influencers'],
-    relatedTopics: ['전현무', '박나래', '김수현', '임영웅', '나는 solo', '살림하는 남자들', '골 때리는 그녀들', '미스터트롯3', '유재석', '박명수'],
+    relatedTopics: ['전현무', '양치승', '김수현', '임영웅', '박명수', '살림하는 남자들', '골 때리는 그녀들', '미스터트롯3', '유재석', '박명수'],
   },
   {
     id: 'ott',
     label: 'OTT',
-    keywords: ['티빙', '쿠팡플레이', '선재 업고 튀어', '하트시그널5', '유미의 세포들 시즌3'],
+    keywords: ['티빙', '쿠팡플레이', '프로젝트 y', '하트시그널5', '유미의 세포들 시즌3'],
     category: 'OTT',
     summary: '플랫폼 자체보다도 독점 공개작과 화제 프로그램이 중심이 돼 검색을 끌어올리는 카테고리다.',
     issueReason: [
@@ -110,7 +110,7 @@ export const trendTopicSeeds: TrendTopicSeed[] = [
     orbit: 1,
     angle: 1.82,
     links: ['entertainment-broadcast', 'gaming', 'sns-influencers'],
-    relatedTopics: ['티빙', 'tving', '쿠팡플레이', '선재 업고 튀어', '하트시그널5', '유미의 세포들 시즌3', '나는 solo, 그 후 사랑은 계속된다'],
+    relatedTopics: ['티빙', 'tving', '쿠팡플레이', '프로젝트 y', '선재 업고 튀어', '하트시그널5', '유미의 세포들 시즌3', '나는 solo, 그 후 사랑은 계속된다'],
   },
   {
     id: 'food-hotplace',
