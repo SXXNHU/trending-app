@@ -7,8 +7,7 @@ const CHILD_ORBIT_SPEED_RANGE = { min: 0.12, max: 0.34 }
 const CHILD_RADIUS_SCALE = { min: 0.06, max: 0.22 }
 const TOPIC_LABEL_SCALE_RANGE = { min: 0.92, max: 1.7 }
 const BASE_ORBIT_SPEED = 0.055
-const MAX_VISIBLE_CHILDREN = 5
-const CHILD_PAGE_DURATION = 5
+const MAX_CHILD_SLOTS = 8
 
 const CATEGORY_HUES: Record<string, number> = {
   Politics: 2,
@@ -45,6 +44,7 @@ type NodeVisual = {
   baseGlowColor: THREE.Color
   glowBaseScale: number
   score: number
+  normScore: number
   momentum: number
   pulsePhaseOffset: number
   radius: number
@@ -66,6 +66,12 @@ type ChildVisual = {
   label: THREE.Sprite
   line: THREE.Line
   parentId: string
+  currentLabel: string
+  labelFade: null | {
+    phase: 'out' | 'in'
+    t: number
+    pendingText: string
+  }
   finalOffset: THREE.Vector3
   radius: number
   orbitRadial: THREE.Vector3
@@ -76,6 +82,11 @@ type ChildVisual = {
   introOffset: number
   slotIndex: number
   siblingCount: number
+}
+
+type PendingLabelBatch = {
+  items: Array<{ visual: ChildVisual; newText: string }>
+  delay: number
 }
 
 function randomBetween(min: number, max: number) {
@@ -101,12 +112,12 @@ function computePulse(
   phaseOffset: number,
 ) {
   if (momentum <= 0) return { opacity: baseOpacity, scale: 1.0 }
-  const hz = 0.5 + momentum * 1.0
-  const amplitude = 0.18 + momentum * 0.32
+  const hz = 0.5 + momentum * 1.2
+  const amplitude = 0.22 + momentum * 0.48
   const unipolar = (Math.sin(elapsed * hz * Math.PI * 2 + phaseOffset) + 1) * 0.5
   return {
     opacity: Math.min(1.0, baseOpacity + unipolar * amplitude),
-    scale: 1.0 + unipolar * momentum * 0.30,
+    scale: 1.0 + unipolar * momentum * 0.65,
   }
 }
 
@@ -156,6 +167,17 @@ function makeLabelSprite(text: string, fontSize: number, isMain = false) {
   return sprite
 }
 
+function swapChildLabelSprite(label: THREE.Sprite, nextText: string, fontSize: number) {
+  const nextSprite = makeLabelSprite(nextText, fontSize, false)
+  const oldMaterial = label.material as THREE.SpriteMaterial
+  const nextMaterial = nextSprite.material as THREE.SpriteMaterial
+  nextMaterial.opacity = 0
+  oldMaterial.map?.dispose()
+  oldMaterial.dispose()
+  label.material = nextMaterial
+  label.scale.copy(nextSprite.scale)
+}
+
 function makeGlowSprite(color: THREE.Color, radius: number) {
   const size = 256
   const canvas = document.createElement('canvas')
@@ -192,8 +214,11 @@ export function buildChildNodes(nodes: TopicNodeData[]) {
   const children: ChildNodeData[] = []
   nodes.forEach((node) => {
     const related = node.relatedTopics ?? []
-    related.forEach((label, index) => {
-      const angle = (Math.PI * 2 * index) / Math.max(related.length, 1)
+    const slotCount = Math.max(0, Math.min(MAX_CHILD_SLOTS, Math.round(node.normScore * MAX_CHILD_SLOTS)))
+
+    for (let index = 0; index < slotCount; index += 1) {
+      const label = related[index] ?? ''
+      const angle = (Math.PI * 2 * index) / Math.max(slotCount, 1)
       const ringRadius = node.radius + 1.6
       const yOffset = Math.sin(angle * 1.3 + node.radius) * 0.7
       const position = new THREE.Vector3(
@@ -202,25 +227,17 @@ export function buildChildNodes(nodes: TopicNodeData[]) {
         node.position.z + Math.sin(angle) * ringRadius,
       )
       children.push({
-        id: `${node.id}-${label}`,
+        id: `${node.id}-slot-${index}`,
         label,
         parentId: node.id,
         position,
         radius: randomBetween(CHILD_RADIUS_SCALE.min, CHILD_RADIUS_SCALE.max) * node.radius,
         slotIndex: index,
-        siblingCount: related.length,
+        siblingCount: slotCount,
       })
-    })
+    }
   })
   return children
-}
-
-function isChildInVisiblePage(slotIndex: number, siblingCount: number, elapsed: number) {
-  if (siblingCount <= MAX_VISIBLE_CHILDREN) return true
-  const pageCount = Math.ceil(siblingCount / MAX_VISIBLE_CHILDREN)
-  const pageIndex = Math.floor(elapsed / CHILD_PAGE_DURATION) % pageCount
-  const start = pageIndex * MAX_VISIBLE_CHILDREN
-  return slotIndex >= start && slotIndex < start + MAX_VISIBLE_CHILDREN
 }
 
 export function createTopicNodes(params: {
@@ -236,6 +253,7 @@ export function createTopicNodes(params: {
   const clickables: ClickableNode[] = []
   const nodeVisuals = new Map<string, NodeVisual>()
   const childVisuals: ChildVisual[] = []
+  const pendingLabelBatches: PendingLabelBatch[] = []
   const nodeHueMap = new Map<string, number>()
   const origin = new THREE.Vector3(0, 0, 0)
   const childLineMaterial = new THREE.LineDashedMaterial({
@@ -251,10 +269,10 @@ export function createTopicNodes(params: {
   nodes.forEach((node) => {
     const pastelHue = CATEGORY_HUES[node.category] ?? 185
     nodeHueMap.set(node.id, pastelHue)
-    const satFactor = 0.2 + node.normScore * 0.7
+    const satFactor = 0.01 + Math.pow(node.normScore, 0.65) * 0.99
     const litBase = 0.12 + node.normScore * 0.12
-    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.72 * satFactor, litBase)
-    const emissiveColor = new THREE.Color().setHSL(pastelHue / 360, 0.90 * satFactor, 0.50 + node.normScore * 0.10)
+    const nodeColor = new THREE.Color().setHSL(pastelHue / 360, 0.92 * satFactor, litBase)
+    const emissiveColor = new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.50 + node.normScore * 0.10)
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(node.radius, 48, 48),
       new THREE.MeshPhysicalMaterial({
@@ -273,7 +291,7 @@ export function createTopicNodes(params: {
     const label = makeLabelSprite(node.label, mainLabelFont, true)
     const labelBaseScale = label.scale.clone().multiplyScalar(radiusToLabelScale(node.radius))
     label.scale.copy(labelBaseScale)
-    const glow = makeGlowSprite(new THREE.Color().setHSL(pastelHue / 360, 0.85 * satFactor, 0.80 + node.normScore * 0.08), node.radius)
+    const glow = makeGlowSprite(new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.80 + node.normScore * 0.08), node.radius)
     const glowMat = glow.material as THREE.SpriteMaterial
     const trailGeometry = new THREE.BufferGeometry().setFromPoints([origin, origin])
     const trail = new THREE.Line(
@@ -309,9 +327,10 @@ export function createTopicNodes(params: {
       trailGeometry,
       label,
       labelBaseScale,
-      baseGlowColor: new THREE.Color().setHSL(pastelHue / 360, 0.85 * satFactor, 0.80 + node.normScore * 0.08),
+      baseGlowColor: new THREE.Color().setHSL(pastelHue / 360, 1.0 * satFactor, 0.80 + node.normScore * 0.08),
       glowBaseScale,
       score: node.trafficScore,
+      normScore: node.normScore,
       momentum: momentumById.get(node.id) ?? 0,
       pulsePhaseOffset: Math.random() * Math.PI * 2,
       radius: node.radius,
@@ -340,10 +359,10 @@ export function createTopicNodes(params: {
     if (!parentNode) return
     const parentHue = nodeHueMap.get(child.parentId) ?? 185
     const childHue = ((parentHue + (childIndex % 3 - 1) * 18) + 360) % 360
-    const childSatFactor = 0.2 + parentNode.normScore * 0.7
+    const childSatFactor = 0.01 + Math.pow(parentNode.normScore, 0.65) * 0.99
     const childLitBase = 0.12 + parentNode.normScore * 0.12
-    const childColor = new THREE.Color().setHSL(childHue / 360, 0.74 * childSatFactor, childLitBase)
-    const childEmissive = new THREE.Color().setHSL(childHue / 360, 0.90 * childSatFactor, 0.48 + parentNode.normScore * 0.10)
+    const childColor = new THREE.Color().setHSL(childHue / 360, 0.92 * childSatFactor, childLitBase)
+    const childEmissive = new THREE.Color().setHSL(childHue / 360, 1.0 * childSatFactor, 0.48 + parentNode.normScore * 0.10)
 
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(child.radius, 24, 24),
@@ -382,6 +401,8 @@ export function createTopicNodes(params: {
       label,
       line,
       parentId: child.parentId,
+      currentLabel: child.label,
+      labelFade: null,
       finalOffset,
       radius: child.radius,
       orbitRadial: finalOffset.clone(),
@@ -401,7 +422,67 @@ export function createTopicNodes(params: {
     })
   })
 
-  return { nodeVisuals, childVisuals, clickables, childLineMaterial }
+  return {
+    nodeVisuals,
+    childVisuals,
+    clickables,
+    childLineMaterial,
+    pendingLabelBatches,
+    childLabelFont,
+  }
+}
+
+export function scheduleChildLabelUpdates(
+  childVisuals: ChildVisual[],
+  pendingBatches: PendingLabelBatch[],
+  newNodes: TopicNodeData[],
+  _childLabelFont: number,
+) {
+  const relatedTopicsByParent = new Map(
+    newNodes.map((node) => [node.id, node.relatedTopics ?? []] as const),
+  )
+  const grouped = new Map<string, Array<{ visual: ChildVisual; newText: string }>>()
+
+  pendingBatches.length = 0
+
+  childVisuals.forEach((visual) => {
+    const nextLabels = relatedTopicsByParent.get(visual.parentId)
+    const newText = nextLabels?.[visual.slotIndex] ?? ''
+
+    const currentTarget = visual.labelFade?.pendingText ?? visual.currentLabel
+    if (currentTarget === newText) return
+
+    const group = grouped.get(visual.parentId)
+    const item = { visual, newText }
+    if (group) {
+      group.push(item)
+      return
+    }
+    grouped.set(visual.parentId, [item])
+  })
+
+  if (grouped.size === 0) return
+
+  const parentQueues = Array.from(grouped.values())
+  const interleaved: Array<{ visual: ChildVisual; newText: string }> = []
+  let consumed = true
+
+  while (consumed) {
+    consumed = false
+    parentQueues.forEach((queue) => {
+      const nextItem = queue.shift()
+      if (!nextItem) return
+      interleaved.push(nextItem)
+      consumed = true
+    })
+  }
+
+  for (let index = 0; index < interleaved.length; index += 10) {
+    pendingBatches.push({
+      items: interleaved.slice(index, index + 10),
+      delay: (index / 10) * 5.0,
+    })
+  }
 }
 
 export function setNodesIdle(
@@ -461,15 +542,15 @@ export function updateNodesForIntro(
   childVisuals.forEach((child) => {
     const parentVisual = nodeVisuals.get(child.parentId)
     if (!parentVisual) return
-    const isVisibleInPage = child.slotIndex < MAX_VISIBLE_CHILDREN
     const childStart = 0.84 + child.introOffset
     const childT = smoothstep(childStart, 1, progress)
     const orbitPosition = parentVisual.mesh.position
       .clone()
       .add(child.finalOffset.clone().multiplyScalar(childT))
-    child.mesh.visible = isVisibleInPage && childT > 0.02
-    child.label.visible = isVisibleInPage && childT > 0.5
-    child.line.visible = isVisibleInPage && childT > 0.16
+    const hasLabel = child.currentLabel.trim().length > 0
+    child.mesh.visible = childT > 0.02
+    child.label.visible = hasLabel && childT > 0.5
+    child.line.visible = childT > 0.16
     child.mesh.position.copy(orbitPosition)
     child.label.position.set(orbitPosition.x, orbitPosition.y + child.radius + 0.42, orbitPosition.z)
     child.line.geometry.setFromPoints([parentVisual.mesh.position, child.mesh.position])
@@ -483,17 +564,30 @@ const _tmpVec = new THREE.Vector3()
 
 export function updateNodesForFinalState(params: {
   elapsed: number
+  dt: number
   nodeVisuals: Map<string, NodeVisual>
   childVisuals: ChildVisual[]
+  pendingLabelBatches: PendingLabelBatch[]
   selectedId: string | null
   hoveredId: string | null
+  childLabelFont: number
 }) {
-  const { elapsed, nodeVisuals, childVisuals, selectedId, hoveredId } = params
+  const {
+    elapsed,
+    dt,
+    nodeVisuals,
+    childVisuals,
+    pendingLabelBatches,
+    selectedId,
+    hoveredId,
+    childLabelFont,
+  } = params
 
   nodeVisuals.forEach((visual, id) => {
     const isSelected = selectedId === id
     const isHovered = hoveredId === id
-    const breathe = 1 + Math.sin(elapsed * 0.9 + visual.pulsePhaseOffset) * 0.06
+    const breatheAmp = 0.03 + visual.normScore * 0.24
+    const breathe = 1 + Math.sin(elapsed * 0.9 + visual.pulsePhaseOffset) * breatheAmp
 
     const currentAngle = visual.orbitBaseAngle + elapsed * visual.orbitSpeed
     const ox = Math.cos(currentAngle) * visual.orbitHorizRadius
@@ -541,10 +635,23 @@ export function updateNodesForFinalState(params: {
     visual.glow.scale.set(scale, scale, 1)
   })
 
+  for (let index = pendingLabelBatches.length - 1; index >= 0; index -= 1) {
+    const batch = pendingLabelBatches[index]
+    batch.delay -= dt
+    if (batch.delay > 0) continue
+    batch.items.forEach(({ visual, newText }) => {
+      visual.labelFade = {
+        phase: 'out',
+        t: 0,
+        pendingText: newText,
+      }
+    })
+    pendingLabelBatches.splice(index, 1)
+  }
+
   childVisuals.forEach((child) => {
     const parentVisual = nodeVisuals.get(child.parentId)
     if (!parentVisual) return
-    const isVisibleInPage = isChildInVisiblePage(child.slotIndex, child.siblingCount, elapsed)
     const orbitAngle = elapsed * child.angularSpeed + child.phaseOffset
     const orbitPosition = parentVisual.mesh.position
       .clone()
@@ -552,9 +659,12 @@ export function updateNodesForFinalState(params: {
       .addScaledVector(child.orbitTangent, Math.sin(orbitAngle))
     const pulse = 1 + Math.sin(elapsed * 1.4 + child.pulsePhase) * 0.06
 
-    child.mesh.visible = isVisibleInPage
-    child.label.visible = isVisibleInPage
-    child.line.visible = isVisibleInPage
+    const hasActiveLabel = child.labelFade
+      ? child.labelFade.pendingText.trim().length > 0 || child.currentLabel.trim().length > 0
+      : child.currentLabel.trim().length > 0
+    child.mesh.visible = true
+    child.label.visible = hasActiveLabel
+    child.line.visible = true
     child.mesh.position.copy(orbitPosition)
     child.mesh.scale.setScalar(pulse)
     child.label.position.set(
@@ -564,6 +674,36 @@ export function updateNodesForFinalState(params: {
     )
     child.line.geometry.setFromPoints([parentVisual.mesh.position, child.mesh.position])
     child.line.computeLineDistances()
+
+    const labelMaterial = child.label.material as THREE.SpriteMaterial
+    if (!child.labelFade) {
+      labelMaterial.opacity = 1
+      return
+    }
+
+    const fadeSpeed = dt / 0.35
+    child.labelFade.t = Math.min(1, child.labelFade.t + fadeSpeed)
+
+    if (child.labelFade.phase === 'out') {
+      labelMaterial.opacity = 1 - child.labelFade.t
+      if (child.labelFade.t < 1) return
+
+      const pendingText = child.labelFade.pendingText
+      swapChildLabelSprite(child.label, pendingText, childLabelFont)
+      child.labelFade = {
+        phase: 'in',
+        t: 0,
+        pendingText,
+      }
+      return
+    }
+
+    labelMaterial.opacity = child.labelFade.t
+    if (child.labelFade.t < 1) return
+
+    child.currentLabel = child.labelFade.pendingText
+    child.labelFade = null
+    labelMaterial.opacity = 1
   })
 }
 
