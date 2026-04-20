@@ -86,7 +86,7 @@ function App() {
         isChild: false,
       })
 
-      topic.relatedTopics?.forEach((label) => {
+      topic.relatedTopics?.slice(0, 5).forEach((label) => {
         items.push({
           key: `${topic.id}-${label}`,
           label,
@@ -106,25 +106,34 @@ function App() {
     if (!scrollContainer || sidebarItems.items.length === 0) return
     const container = scrollContainer
 
+    const isMobile = () => window.matchMedia('(max-width: 640px)').matches
+
     let frameId: number
     let pos = 0
     let paused = false
-    const onEnter = () => {
-      paused = true
-    }
-    const onLeave = () => {
-      paused = false
-    }
+
+    const onEnter = () => { paused = true }
+    const onLeave = () => { paused = false }
+    const onTouchStart = () => { paused = true }
+    const onTouchEnd = () => { paused = false }
 
     container.addEventListener('mouseenter', onEnter)
     container.addEventListener('mouseleave', onLeave)
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchend', onTouchEnd, { passive: true })
 
     function tick() {
       if (!paused) {
         pos += 0.45
-        const half = container.scrollHeight / 2
-        if (half > 0 && pos >= half) pos -= half
-        container.scrollTop = pos
+        if (isMobile()) {
+          const half = container.scrollWidth / 2
+          if (half > 0 && pos >= half) pos -= half
+          container.scrollLeft = pos
+        } else {
+          const half = container.scrollHeight / 2
+          if (half > 0 && pos >= half) pos -= half
+          container.scrollTop = pos
+        }
       }
       frameId = requestAnimationFrame(tick)
     }
@@ -135,6 +144,8 @@ function App() {
       cancelAnimationFrame(frameId)
       container.removeEventListener('mouseenter', onEnter)
       container.removeEventListener('mouseleave', onLeave)
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchend', onTouchEnd)
     }
   }, [sidebarItems])
 
