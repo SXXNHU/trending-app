@@ -43,6 +43,7 @@ export function createSceneRuntime({
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(mount.clientWidth, mount.clientHeight)
   renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.domElement.style.touchAction = 'none'
   mount.innerHTML = ''
   mount.appendChild(renderer.domElement)
 
