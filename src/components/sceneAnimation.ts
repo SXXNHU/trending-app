@@ -12,8 +12,8 @@ type StartSceneAnimationParams = {
   background: ReturnType<typeof import('./BackgroundEffects').createBackgroundEffects>
   rings: THREE.Mesh[]
   nodeScene: ReturnType<typeof import('./TopicNodes').createTopicNodes>
-  introPhase: 'idle' | 'running' | 'complete'
-  introDuration: number
+  introPhaseRef: { current: 'idle' | 'running' | 'complete' }
+  introDurationRef: { current: number }
   viewportPreset: {
     cameraDistance: number
     cameraHeight: number
@@ -28,7 +28,7 @@ type StartSceneAnimationParams = {
   rotationTarget: THREE.Vector2
   currentRotation: THREE.Vector2
   baseSceneRotation: THREE.Euler
-  onIntroComplete: () => void
+  onIntroCompleteRef: { current: () => void }
   setIntroDone: (value: boolean) => void
   focusRequestRef: { current: { id: string; seq: number } | null }
 }
@@ -41,8 +41,8 @@ export function startSceneAnimation({
   background,
   rings,
   nodeScene,
-  introPhase,
-  introDuration,
+  introPhaseRef,
+  introDurationRef,
   viewportPreset,
   defaultCameraPosition,
   cameraTarget,
@@ -53,24 +53,29 @@ export function startSceneAnimation({
   rotationTarget,
   currentRotation,
   baseSceneRotation,
-  onIntroComplete,
+  onIntroCompleteRef,
   setIntroDone,
   focusRequestRef,
 }: StartSceneAnimationParams) {
   const clock = new THREE.Clock()
   let introStartedAt = 0
-  let introDone = introPhase === 'complete'
+  let introDone = introPhaseRef.current === 'complete'
   let lastFocusSeqHandled = 0
+  let prevElapsed = 0
   setIntroDone(introDone)
 
   function animate() {
     const elapsed = clock.getElapsedTime()
+    const dt = elapsed - prevElapsed
+    prevElapsed = elapsed
     updateBackgroundEffects(
       elapsed,
       background.starLayers,
       background.networkLayers,
       background.accentOrbs,
     )
+
+    const introPhase = introPhaseRef.current
 
     if (introPhase === 'idle') {
       setNodesIdle(nodeScene.nodeVisuals, nodeScene.childVisuals)
@@ -79,7 +84,7 @@ export function startSceneAnimation({
       lookTarget.lerp(new THREE.Vector3(0, 0, 0), 0.08)
     } else if (introPhase === 'running') {
       if (!introStartedAt) introStartedAt = elapsed
-      const progress = getOnboardingProgress(elapsed, introStartedAt, introDuration)
+      const progress = getOnboardingProgress(elapsed, introStartedAt, introDurationRef.current)
       const cinematicZoom = THREE.MathUtils.lerp(
         viewportPreset.cameraDistance + 4.5,
         viewportPreset.cameraDistance,
@@ -100,7 +105,7 @@ export function startSceneAnimation({
       if (progress >= 1 && !introDone) {
         introDone = true
         setIntroDone(true)
-        onIntroComplete()
+        onIntroCompleteRef.current()
       }
     } else {
       const req = focusRequestRef.current
@@ -122,10 +127,13 @@ export function startSceneAnimation({
       sceneRoot.rotation.y = currentRotation.y
       updateNodesForFinalState({
         elapsed,
+        dt,
         nodeVisuals: nodeScene.nodeVisuals,
         childVisuals: nodeScene.childVisuals,
+        pendingLabelBatches: nodeScene.pendingLabelBatches,
         selectedId: selectedIdRef.current,
         hoveredId: hoveredIdRef.current,
+        childLabelFont: nodeScene.childLabelFont,
       })
       setOrbitRingOpacity(rings, 0.18)
     }
