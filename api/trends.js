@@ -101,7 +101,7 @@ async function fetchBatch(topics, clientId, clientSecret) {
 async function fetchSearchChannel({ clientId, clientSecret, query, path, source }) {
   const encodedQuery = encodeURIComponent(query)
   const response = await fetch(
-    `https://openapi.naver.com/v1/search/${path}.json?query=${encodedQuery}&display=3&sort=date`,
+    `https://openapi.naver.com/v1/search/${path}.json?query=${encodedQuery}&display=${path === 'news' ? 8 : 4}&sort=date`,
     {
       headers: {
         'X-Naver-Client-Id': clientId,
@@ -183,7 +183,7 @@ async function fetchNaverNewsFragmentEvidence(query) {
   const script = json.collection?.[0]?.script ?? ''
   const items = extractNewsItemsFromScript(script)
 
-  return items.filter((item) => item.title || item.snippet).slice(0, 5)
+  return items.filter((item) => item.title || item.snippet).slice(0, 8)
 }
 
 async function fetchEvidence(topic, clientId, clientSecret) {
@@ -215,7 +215,7 @@ async function fetchEvidence(topic, clientId, clientSecret) {
   ])
 
   const news = newsFragment.length ? newsFragment : newsApi
-  return [...news, ...blogs, ...cafes].slice(0, 5)
+  return [...news.slice(0, 8), ...blogs.slice(0, 4), ...cafes.slice(0, 4)]
 }
 
 function buildIssueReason(topic, evidence) {
